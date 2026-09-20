@@ -307,6 +307,7 @@
     document.getElementById('setUpdApi').value = up.apiBase || 'https://api.github.com';
     document.getElementById('setUpdMirror').value = up.downloadMirror || '';
     var when = up.checkedAt ? new Date(up.checkedAt).toLocaleString() : '从未检查';
+    if (up.staleCache) when += '（升级后待重新检查）';
     var st = '当前版本 ' + (up.currentVersion || '?') + ' · 上次检查 ' + when;
     if (up.error) st += ' · 检查失败: ' + up.error;
     else if (up.hasUpdate) st += ' · 有新版 ' + up.latestVersion;

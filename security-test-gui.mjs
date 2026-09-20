@@ -107,6 +107,15 @@ async function main() {
   const dis = await req(port, 'POST', '/api/action', { headers: { 'x-tunnel-token': token, origin: 'http://127.0.0.1:' + port }, body: { action: 'disable', id: id } });
   ok('G15 停用通道会顺带把它停掉', dis.status === 200 && dis.json.profile.enabled === false && !dis.json.profiles.filter((p) => p.id === id)[0].running, dis.status);
 
+  // 模拟"1.0.0 时代留下的缓存说 1.4.0 是新版"，当前已经是 1.5.x => 不能再提示有更新
+  const cacheFile = path.join(tmp, 'state', 'update.json');
+  fs.writeFileSync(cacheFile, JSON.stringify({ ok: true, checkedAt: Date.now(), currentVersion: '1.0.0',
+    latestVersion: '1.4.0', hasUpdate: true, ignored: false, htmlUrl: 'https://example.invalid' }, null, 2));
+  const staleState = await req(port, 'GET', '/api/state', { headers: { 'x-tunnel-token': token } });
+  const su = (staleState.json && staleState.json.update) || {};
+  ok('G16e 升级后不再拿旧缓存提示"有新版"', su.hasUpdate === false && su.latestVersion === '1.4.0' && su.staleCache === true,
+    JSON.stringify({ has: su.hasUpdate, latest: su.latestVersion, stale: su.staleCache, cur: su.currentVersion }));
+
   const updNoTok = await req(port, 'GET', '/api/update');
   ok('G16a /api/update 无 token 401', updNoTok.status === 401, updNoTok.status);
   const updPost = await req(port, 'POST', '/api/update', { headers: { 'x-tunnel-token': token, origin: 'https://evil.example' }, body: { action: 'check' } });
