@@ -2,6 +2,20 @@
 
 ---
 
+# 1.5.3：局域网设备映射（--target）+ 修更新提示自相矛盾
+
+1. 上游目标可指定为局域网设备：tunnel --target 192.168.1.50:8080 / tunnel add --name nas --port 5000 --target 192.168.1.50:5000；
+   配置页新增「目标地址」输入框，MCP 的 create_tunnel 也支持 target
+2. 默认只允许本机/局域网地址（10/8、172.16/12、192.168/16、回环、fc00::/7），
+   公网地址 / 0.0.0.0 / 组播 / 链路本地（含 169.254.169.254）默认拒绝，需要时用 --allow-public-target，
+   避免这个工具被当成开放代理
+3. 目标是局域网设备时，转发给设备的 Host 头改写成设备自己的地址（原来是 127.0.0.1:网关，设备不认）
+4. 支持 https 上游：--target-secure（自签证书可配合 --target-insecure-tls）
+5. 修：升级后配置页拿旧缓存提示"发现新版本 1.4.0（当前 1.5.1）"——hasUpdate 改成现场按当前版本重算，升级后立刻重查
+6. 测试：node test-upstream.mjs 20 项（地址校验 + 真把局域网设备通过密码门转出去 + 公网目标被拒）
+
+---
+
 # 1.5.2：原生无控制台启动器（不再依赖 VBScript）
 
 - 新增 build/launcher/Launcher.cs + build/make-launcher.mjs：用系统自带 csc.exe 编译出

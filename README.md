@@ -220,3 +220,18 @@ build/launcher/Launcher.cs with the csc.exe that ships with Windows. It is a **G
 It also removed the old VBScript launcher, which matters because Microsoft is deprecating VBScript
 (optional feature since Windows 11 24H2). Rebuild it with `node build/make-launcher.mjs`.
 
+## Expose a LAN device, not just localhost
+
+By default the tunnel points at `127.0.0.1:<port>`. To publish another machine on your network - a NAS, a camera, a
+printer web UI, a server on the LAN - set the target explicitly:
+
+    public-tunnel.exe --target 192.168.1.50:8080 --ttl 1h
+    public-tunnel.exe add --name nas --port 5000 --target 192.168.1.50:5000
+
+- Allowed by default: loopback, 10/8, 172.16/12, 192.168/16, fc00::/7 and hostnames that resolve to them.
+- **Refused by default**: public IPs, 0.0.0.0/::, multicast and link-local (169.254.x.x, incl. 169.254.169.254),
+  so the tunnel can never be turned into an open proxy. Override with `--allow-public-target` if you really mean it.
+- The password gate applies exactly the same way, and the `Host` header seen by the device is its own address
+  (override with `--upstream-host`).
+- HTTPS upstreams: `--target-secure` (+ `--target-insecure-tls` for self-signed certificates).
+

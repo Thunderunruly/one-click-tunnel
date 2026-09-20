@@ -190,3 +190,17 @@ Internet -> Cloudflare 边缘 -> cloudflared -> 密码门 -> 你的应用 里，
 隐藏启动 `public-tunnel.exe app` 后立刻退出，**不会闪出命令行窗口**。
 这同时去掉了对 VBScript 的依赖（微软正在弃用它，Win11 24H2 起是可选功能）。
 
+## 把局域网设备映射出去（不只是本机端口）
+
+默认目标是 `127.0.0.1:<port>`。要把局域网里的另一台设备（NAS、摄像头、打印机面板、别的机器上的服务）发出去，
+直接指定目标地址：
+
+    public-tunnel.exe --target 192.168.1.50:8080 --ttl 1h
+    public-tunnel.exe add --name nas --port 5000 --target 192.168.1.50:5000
+
+- **默认允许**：回环、10/8、172.16/12、192.168/16、fc00::/7，以及解析到这些地址的主机名
+- **默认拒绝**：公网地址、0.0.0.0/::、组播、链路本地（169.254.x.x，含云元数据 169.254.169.254），
+  避免这个工具变成开放代理；确实需要时用 --allow-public-target
+- 密码门一模一样生效；设备看到的 Host 头是**它自己的地址**（原来给的是 127.0.0.1:网关，设备不认），要改可用 --upstream-host
+- https 上游：--target-secure（自签证书配 --target-insecure-tls）
+- 配置页有「目标地址」输入框；MCP 的 create_tunnel 支持 target；tunnel info 会显示目标地址

@@ -125,6 +125,7 @@
     <div class="grid">
       <div class="field"><label>名称</label><input id="addName" placeholder="例如 前端 3000"></div>
       <div class="field"><label>本机端口</label><input id="addPort" type="number" min="1" max="65535" placeholder="3000"></div>
+      <div class="field"><label>目标地址（留空=本机 127.0.0.1）</label><input id="addTarget" class="mono" placeholder="192.168.1.50:8080"></div>
       <div class="field"><label>网关端口（留空自动分配）</label><input id="addGateway" type="number" min="1024" max="65535" placeholder="自动"></div>
       <div class="field"><label>有效期</label><select id="addTtl"></select></div>
       <div class="field"><label>密码</label>
@@ -235,6 +236,7 @@
     h += '<button class="danger" data-act="del" data-id="' + esc(s.id) + '">删除</button>';
     h += '</div>';
     h += '<div class="row" style="margin-top:8px"><span class="muted">本机端口</span><span class="mono">' + s.port + '</span>';
+    h += '<span class="muted">目标</span><span class="mono">' + esc(s.target || ('127.0.0.1:' + s.port)) + '</span>';
     h += '<span class="muted">网关</span><span class="mono">127.0.0.1:' + s.gateway + '</span>';
     h += '<span class="muted">TTL</span><span class="mono">' + esc(s.ttl) + '</span>';
     h += '<span class="muted">剩余</span><span class="mono" data-remain="' + esc(s.id) + '">' + remainText(s) + '</span></div>';
@@ -260,6 +262,7 @@
     h += '<select data-edit="pwmode" data-id="' + esc(s.id) + '"><option value="random"' + (s.passwordMode !== 'fixed' ? ' selected' : '') + '>每次随机</option><option value="fixed"' + (s.passwordMode === 'fixed' ? ' selected' : '') + '>手动固定</option></select>';
     h += '<input data-edit="password" data-id="' + esc(s.id) + '" class="mono" placeholder="手动密码" value="' + esc(s.passwordMode === 'fixed' ? s.password : '') + '">';
     h += '<button class="primary" data-act="save" data-id="' + esc(s.id) + '">保存</button>';
+    h += '<input data-edit="target" data-id="' + esc(s.id) + '" class="mono" placeholder="192.168.1.50:8080" value="' + esc(s.target || '') + '">';
     h += '<select data-edit="mode" data-id="' + esc(s.id) + '"><option value="quick"' + (s.mode !== 'named' ? ' selected' : '') + '>快速隧道</option><option value="named"' + (s.mode === 'named' ? ' selected' : '') + '>命名隧道(自有域名)</option></select>';
     h += '<input data-edit="hostname" data-id="' + esc(s.id) + '" class="mono" placeholder="app.example.com,b.example.com" value="' + esc((s.hostnames && s.hostnames.length ? s.hostnames : [s.hostname || '']).filter(Boolean).join(',')) + '">';
     h += '<button data-act="setupDomain" data-id="' + esc(s.id) + '">建隧道并绑定域名</button>';
@@ -373,7 +376,9 @@
       var pwd = document.querySelector('[data-edit="password"][data-id="' + id + '"]').value;
       var tmode = document.querySelector('[data-edit="mode"][data-id="' + id + '"]').value;
       var host = document.querySelector('[data-edit="hostname"][data-id="' + id + '"]').value;
-      var patch = { ttl: ttl, passwordMode: mode, mode: tmode, hostname: host };
+      var tgt = document.querySelector('[data-edit="target"][data-id="' + id + '"]');
+      var patch = { ttl: ttl, passwordMode: mode, mode: tmode, hostname: host, target: tgt ? tgt.value.trim() : undefined };
+      if (patch.target === undefined) delete patch.target;
       if (mode === 'fixed') patch.password = pwd;
       return done(api('/api/profile', { id: id, patch: patch }).then(function () { toast('已保存（重新启动后生效）'); }));
     }
@@ -472,6 +477,7 @@
         password: document.getElementById('addPassword').value,
         autoStart: document.getElementById('addAuto').checked,
         noTunnel: document.getElementById('addNoTunnel').checked,
+        target: document.getElementById('addTarget').value.trim(),
         mode: document.getElementById('addMode').value,
         hostname: document.getElementById('addHostname').value.trim()
       };

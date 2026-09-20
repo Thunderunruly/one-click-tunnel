@@ -53,7 +53,8 @@ function parseArgs(argv) {
   const out = { port: 3000, ttl: '1h', password: '', gateway: 18080, host: '127.0.0.1',
     upstreamHost: '', cloudflared: '', noDownload: false, noTunnel: false, open: false, forcePublicGateway: false, rateLimit: 3000, allowHosts: [],
     runProfile: '', config: '', stateFile: '', name: '',
-    tunnelMode: '', hostname: '', hostnames: [], tunnelName: '', dryRun: false };
+    tunnelMode: '', hostname: '', hostnames: [], tunnelName: '', dryRun: false,
+    target: '', allowPublicTarget: false, targetSecure: false, targetInsecureTLS: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -70,6 +71,10 @@ function parseArgs(argv) {
     else if (a === '--config') out.config = String(next());
     else if (a === '--state-file') out.stateFile = String(next());
     else if (a === '--name') out.name = String(next());
+    else if (a === '--target') out.target = String(next());
+    else if (a === '--allow-public-target') out.allowPublicTarget = true;
+    else if (a === '--target-secure') out.targetSecure = true;
+    else if (a === '--target-insecure-tls') out.targetInsecureTLS = true;
     else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--force-public-gateway') out.forcePublicGateway = true;
     else if (a === '--rate-limit') out.rateLimit = Number(next());
@@ -82,7 +87,11 @@ function parseArgs(argv) {
 function printHelp() {
   console.log('用法: tunnel [选项]');
   console.log('');
-  console.log('  --port, -p <端口>        要暴露的本机服务端口（默认 3000）');
+  console.log('  --port, -p <端口>        要暴露的服务端口（默认 3000）');
+  console.log('  --target <host:port>     上游目标：默认 127.0.0.1:<port>；可填局域网设备，如 192.168.1.50:8080');
+  console.log('  --allow-public-target    允许目标是公网地址（默认拒绝，避免变成开放代理）');
+  console.log('  --target-secure          用 https 连接上游（局域网设备带证书时）');
+  console.log('  --target-insecure-tls    连接上游时跳过证书校验（自签证书，慎用）');
   console.log('  --ttl, -t <时长>         存活时长，如 30m / 2h / 1d（默认 1h，从公网地址就绪起算）');
   console.log('  --password, -P <密码>    访问密码（默认随机生成，也可用环境变量 TUNNEL_PASSWORD）');
   console.log('  --gateway, -g <端口>     本地密码门端口（默认 18080，只监听 127.0.0.1）');
@@ -180,11 +189,14 @@ async function ensureCloudflared(cfg) {
 // ---------------- 反向代理 ----------------
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade']);
 
-function proxyHttp(req, res, targetPort, extraHeaders) {
+function proxyHttp(req, res, up, extraHeaders) {
+  const targetPort = up.port;
   const headers = { ...req.headers, ...extraHeaders };
   for (const h of Object.keys(headers)) if (HOP_BY_HOP.has(h.toLowerCase())) delete headers[h];
-  const upstream = http.request(
-    { host: '127.0.0.1', port: targetPort, method: req.method, path: req.url, headers },
+  const transport = up.secure ? https : http;
+  const upstream = transport.request(
+    { host: up.host, port: targetPort, method: req.method, path: req.url, headers,
+      rejectUnauthorized: up.insecureTLS ? false : undefined, servername: up.secure ? up.host : undefined },
     (up) => {
       const outHeaders = { ...up.headers };
       for (const h of Object.keys(outHeaders)) if (HOP_BY_HOP.has(h.toLowerCase())) delete outHeaders[h];
@@ -229,6 +241,8 @@ function applyProfile(args) {
   if (p.passwordMode === 'fixed' && p.password) args.password = String(p.password);
   if (p.openBrowser) args.open = true;
   if (p.noTunnel) args.noTunnel = true;
+  if (p.target) args.target = String(p.target);
+  if (p.allowPublicTarget) args.allowPublicTarget = true;
   args.tunnelMode = String(p.mode || 'quick');
   args.hostname = String(p.hostname || '');
   args.tunnelName = String(p.tunnelName || p.id || '');
@@ -248,6 +262,16 @@ async function main() {
     process.exit(2);
   }
   const NAMED = require('./lib/named.js');
+  const UPSTREAM = require('./lib/upstream.js');
+  let up = null;
+  try {
+    up = await UPSTREAM.resolveTarget({ target: args.target, port: args.port, allowPublic: args.allowPublicTarget,
+      secure: args.targetSecure, insecureTLS: args.targetInsecureTLS });
+  } catch (e) {
+    console.error('目标地址不可用: ' + (e && e.message ? e.message : e));
+    process.exit(2);
+  }
+  log('上游目标: ' + up.label);
   const ttlRaw = String(args.ttl || '').trim().toLowerCase();
   const forever = (ttlRaw === 'forever' || ttlRaw === '0' || ttlRaw === 'inf' || ttlRaw === 'never');
   const ttlMs = forever ? 0 : parseTtl(args.ttl);
@@ -263,6 +287,7 @@ async function main() {
   logStream = fs.createWriteStream(logFile, { flags: 'a' });
   writeState({ id: args.runProfile || '', name: args.name || '', pid: process.pid, port: args.port,
     gateway: args.gateway, ttl: args.ttl, host: args.host, password: password, running: true,
+    target: up.host + ':' + up.port, targetKind: up.kind,
     phase: 'starting', startedAt: Date.now(), logFile: logFile, exitReason: '', error: '',
     mode: isNamedMode ? 'named' : 'quick', hostname: args.hostname || '', forever: forever });
 
@@ -364,6 +389,9 @@ async function main() {
     return req.socket.remoteAddress || '?';
   }
   /** 只对隧道域名/本机透传原始 Host，其它一律改写，避免 Host 头注入上游服务 */
+  function upHostHeader() {
+    return args.upstreamHost || (up ? up.hostHeader : '127.0.0.1:' + args.port);
+  }
   function hostAllowed(hostHeader) {
     const host = String(hostHeader || '').replace(/:\d+$/, '').toLowerCase();
     if (!host) return false;
@@ -390,7 +418,8 @@ async function main() {
         if (passwordOk(i >= 0 ? decoded.slice(i + 1) : decoded)) delete req.headers.authorization;
       } catch {}
     }
-    if (!hostAllowed(req.headers.host)) req.headers.host = '127.0.0.1:' + args.port;
+    const isLoopTarget = !up || up.kind === 'loopback';
+    if (!isLoopTarget || !hostAllowed(req.headers.host)) req.headers.host = upHostHeader();
     // 可选：强制改写转发给上游的 Host（如让 dsh-pocket 按 loopback 处理、跳过它的第二道 PIN）
     if (args.upstreamHost) req.headers.host = args.upstreamHost;
   }
@@ -501,7 +530,7 @@ async function main() {
     }
 
     sanitizeIncoming(req);
-    proxyHttp(req, res, args.port, extra);
+    proxyHttp(req, res, up, extra);
   });
 
   // CONNECT（把本机当正向代理跳板）一律拒绝
@@ -523,7 +552,9 @@ async function main() {
     // 否则上游收到的是普通 GET，永远等不到 101（表现为前端一直"重连中"）。
     headers.connection = 'Upgrade';
     headers.upgrade = req.headers.upgrade || 'websocket';
-    const upstream = http.request({ host: '127.0.0.1', port: args.port, method: req.method, path: req.url, headers });
+    const wsTransport = up.secure ? https : http;
+    const upstream = wsTransport.request({ host: up.host, port: up.port, method: req.method, path: req.url, headers,
+      rejectUnauthorized: up.insecureTLS ? false : undefined });
     upstream.on('upgrade', (up, upSocket, upHead) => {
       socket.write('HTTP/1.1 101 Switching Protocols\r\n' + Object.entries(up.headers).map(([k, v]) => k + ': ' + v).join('\r\n') + '\r\n\r\n');
       if (upHead && upHead.length) socket.write(upHead);
@@ -646,7 +677,7 @@ async function main() {
   console.log('\n' + bar);
   console.log((args.noTunnel ? '  本地地址     : ' : '  临时公网地址 : ') + url);
   console.log('  访问密码     : ' + password + (generated ? '   （自动生成）' : ''));
-  console.log('  映射到本机   : 127.0.0.1:' + args.port + '   （网关 ' + args.host + ':' + args.gateway + '）');
+  console.log('  上游目标     : ' + up.label + (up.kind === 'lan' ? '   （局域网设备）' : '') + '   （网关 ' + args.host + ':' + args.gateway + '）');
   console.log('  自动关闭时间 : ' + hhmm + (forever
     ? '   （TTL=forever：地址长期有效，关掉程序才停止）'
     : '   （TTL ' + Math.round(ttlMs / 60000) + ' 分钟，从地址就绪起算）'));
