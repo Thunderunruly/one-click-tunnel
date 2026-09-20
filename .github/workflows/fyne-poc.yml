@@ -1,0 +1,90 @@
+name: Fyne PoC (3 platforms)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'poc/fyne/**'
+      - '.github/workflows/fyne-poc.yml'
+
+jobs:
+  windows:
+    name: build on windows-latest
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - name: Build (GUI subsystem, no console window)
+        working-directory: poc/fyne
+        shell: bash
+        run: |
+          go mod tidy
+          go build -ldflags "-H windowsgui" -o oct-poc-windows.exe .
+          ls -l oct-poc-windows.exe
+      - name: Report PE subsystem and size
+        working-directory: poc/fyne
+        shell: pwsh
+        run: |
+          $b = [IO.File]::ReadAllBytes("oct-poc-windows.exe")
+          $pe = [BitConverter]::ToInt32($b, 0x3C)
+          $magic = [BitConverter]::ToUInt16($b, $pe + 24)
+          $sub = [BitConverter]::ToUInt16($b, $pe + 24 + 0x44)
+          Write-Host "magic=$('{0:X}' -f $magic) subsystem=$sub (2=GUI, 3=Console) size=$([math]::Round($b.Length/1MB,1))MB"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oct-poc-windows
+          path: poc/fyne/oct-poc-windows.exe
+          if-no-files-found: error
+
+  macos:
+    name: build on macos-latest
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - name: Build
+        working-directory: poc/fyne
+        shell: bash
+        run: |
+          go mod tidy
+          go build -o oct-poc-macos .
+          ls -l oct-poc-macos
+          echo "size(MB): $(( $(stat -f%z oct-poc-macos) / 1048576 ))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oct-poc-macos
+          path: poc/fyne/oct-poc-macos
+          if-no-files-found: error
+
+  linux:
+    name: build on ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - name: Install GUI deps (Fyne needs OpenGL/X11 headers)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libxkbcommon-dev
+      - name: Build
+        working-directory: poc/fyne
+        shell: bash
+        run: |
+          go mod tidy
+          go build -o oct-poc-linux .
+          ls -l oct-poc-linux
+          echo "size(MB): $(( $(stat -c%s oct-poc-linux) / 1048576 ))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oct-poc-linux
+          path: poc/fyne/oct-poc-linux
+          if-no-files-found: error
