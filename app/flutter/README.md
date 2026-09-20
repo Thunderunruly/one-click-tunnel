@@ -24,7 +24,10 @@ flutter pub get
 flutter run -d windows     # 或 -d macos / -d linux
 ```
 
-核心没在跑时，外壳会尝试在**同目录**或 `%LOCALAPPDATA%\one-click-tunnel` 里找 `oct.exe` / `oct`，然后执行 `oct app`。
+核心没在跑时，外壳会尝试在**同目录**（以及 `%LOCALAPPDATA%\one-click-tunnel`、`%PROGRAMDATA%\one-click-tunnel`）里找 `oct.exe` / `oct`，然后执行 `oct app`。
+
+token（`config.json` 里的 `gui.token`）按这个顺序找：`ONE_CLICK_TUNNEL_DIR` → 程序所在目录 → 上一级目录 → `%LOCALAPPDATA%\one-click-tunnel` → `%LOCALAPPDATA%\Programs\one-click-tunnel` → `%PROGRAMDATA%\one-click-tunnel` → `%ProgramFiles%\one-click-tunnel`（macOS/Linux 用各自的用户数据目录）。
+所以最简单的用法：把外壳解压到 `oct.exe` 旁边；读不到 token 时界面会直接提示。
 
 ## 打包
 

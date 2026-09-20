@@ -62,18 +62,28 @@ class Core {
   List<String> candidates() {
     final sep = Platform.pathSeparator;
     final list = <String>[];
-    final env = Platform.environment['ONE_CLICK_TUNNEL_DIR'];
-    if (env != null && env.isNotEmpty) list.add(env + sep + 'config.json');
-    list.add(File(Platform.resolvedExecutable).parent.path + sep + 'config.json');
+    void add(String? dir) {
+      if (dir != null && dir.isNotEmpty) list.add(dir + sep + 'config.json');
+    }
+
+    add(Platform.environment['ONE_CLICK_TUNNEL_DIR']);
+    final exeDir = File(Platform.resolvedExecutable).parent.path;
+    add(exeDir);
+    add(File(exeDir).parent.path);
     if (Platform.isWindows) {
       final la = Platform.environment['LOCALAPPDATA'];
-      if (la != null) list.add(la + sep + 'one-click-tunnel' + sep + 'config.json');
+      final pd = Platform.environment['PROGRAMDATA'];
+      final pf = Platform.environment['ProgramFiles'];
+      add(la == null ? null : la + sep + 'one-click-tunnel');
+      add(la == null ? null : la + sep + 'Programs' + sep + 'one-click-tunnel');
+      add(pd == null ? null : pd + sep + 'one-click-tunnel');
+      add(pf == null ? null : pf + sep + 'one-click-tunnel');
     } else if (Platform.isMacOS) {
       final h = Platform.environment['HOME'];
-      if (h != null) list.add(h + '/Library/Application Support/one-click-tunnel/config.json');
+      add(h == null ? null : h + '/Library/Application Support/one-click-tunnel');
     } else {
       final h = Platform.environment['HOME'];
-      if (h != null) list.add(h + '/.config/one-click-tunnel/config.json');
+      add(h == null ? null : h + '/.config/one-click-tunnel');
     }
     return list;
   }
@@ -324,6 +334,14 @@ class ShellPageState extends State<ShellPage> with WindowListener, TrayListener 
     setState(() => logText = t.length > 8000 ? t.substring(t.length - 8000) : t);
   }
 
+  String tokenHint() {
+    if (widget.core.token == null) {
+      return '核心在线，但没读到 config.json（拿不到 token）。\n'
+          '把本程序放到 oct.exe 同目录，或设置环境变量 ONE_CLICK_TUNNEL_DIR 指向数据目录。';
+    }
+    return '还没有通道。用 oct add 或配置页创建。';
+  }
+
   Color dotColor(Map<String, dynamic> c) {
     if (c['running'] == true) return kOk;
     final e = c['error'];
@@ -467,9 +485,9 @@ class ShellPageState extends State<ShellPage> with WindowListener, TrayListener 
                       ),
                     ),
                   if (channels.isEmpty)
-                    const Padding(
-                        padding: EdgeInsets.all(14),
-                        child: Text('还没有通道。用 oct add 或配置页创建。', style: TextStyle(fontSize: 12, color: kMuted))),
+                    Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Text(tokenHint(), style: const TextStyle(fontSize: 12, color: kMuted))),
                 ]),
               ),
             ),
