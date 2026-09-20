@@ -192,3 +192,23 @@ Releases are produced automatically by GitHub Actions: push a tag like v1.1.0 an
 Inno Setup installer, then publishes them to the GitHub release.
 
 MIT licensed. cloudflared is a separate binary by Cloudflare (Apache-2.0).
+
+## Why not Go? (measured, not guessed)
+
+The password gate is I/O bound, not CPU bound. On a local loopback benchmark (`build/bench.mjs`, 4000 requests,
+40 concurrent, keep-alive) it adds **+0.62 ms p50** and keeps ~86% of the raw throughput (14.0k vs 16.3k req/s),
+while the real request path - Internet -> Cloudflare edge -> cloudflared -> gate -> your app - is dominated by the
+network and by cloudflared, which is itself written in Go.
+
+| metric | measured |
+| --- | --- |
+| gate overhead | +0.62 ms p50, +1.25 ms p95 |
+| throughput | 14,035 req/s gated vs 16,260 req/s direct |
+| per-tunnel memory | 72 MB gate process + 46 MB cloudflared |
+| cold start | 55 ms |
+| artifacts | exe 83.4 MB, cloudflared 52.4 MB, portable zip 49.2 MB |
+
+A Go rewrite would mostly buy a smaller binary (~10 MB) and less memory per tunnel - packaging wins, not throughput -
+so the Node implementation stays. Re-measure any time with `node build/bench.mjs` (or `npm run bench`); if a real
+workload ever reaches these numbers, revisit the decision with data.
+

@@ -163,3 +163,23 @@ TRACE/CONNECT/绝对形式请求行、Host 改写与透传、XFF 与 x-real-ip �
 - 某些路由器 DNS 不解析 *.trycloudflare.com 快速隧道域名（本机就是），浏览器需开「安全 DNS / DoH」；
   公网测试脚本因此用 1.1.1.1 解析。
 - 修改 tunnel.js 后必须重启已运行的实例才会生效（脚本启动时一次性加载）。
+
+## 为什么不用 Go 重写（有实测数据）
+
+密码门是 I/O 密集型，不是 CPU 密集型。本地回环基准（`build/bench.mjs`，4000 请求 / 40 并发 / keep-alive）：
+密码门只增加 **p50 +0.62ms**、保留约 86% 的原始吞吐（14.0k vs 16.3k req/s）；而真实链路
+Internet -> Cloudflare 边缘 -> cloudflared -> 密码门 -> 你的应用 里，耗时主要是网络和 cloudflared
+（**cloudflared 本身就是 Go 写的**）。
+
+| 指标 | 实测值 |
+| --- | --- |
+| 密码门额外延迟 | p50 +0.62ms、p95 +1.25ms |
+| 吞吐 | 经过门 14,035 req/s；直连 16,260 req/s |
+| 单通道内存 | 密码门 72 MB + cloudflared 46 MB |
+| 冷启动 | 55 ms |
+| 产物体积 | exe 83.4 MB、cloudflared 52.4 MB、便携 zip 49.2 MB |
+
+用 Go 重写主要能换来更小的二进制（约 10MB）和更少的内存，属于**分发/资源占用**的收益，不是性能收益，
+所以决定保留 Node 实现。随时可以 `node build/bench.mjs`（或 `npm run bench`）复测；将来真遇到这个量级的负载，
+再拿数据重新评估。
+

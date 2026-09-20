@@ -20,7 +20,8 @@
     "test": "node security-test.mjs && node test-multi.mjs && node security-test-gui.mjs && node test-mcp.mjs",
     "test:exe": "node test-exe.mjs",
     "test:installer": "node build/test-installer.mjs",
-    "test:live": "node security-test-live.mjs"
+    "test:live": "node security-test-live.mjs",
+    "bench": "node build/bench.mjs"
   },
   "keywords": [
     "cloudflare-tunnel",
