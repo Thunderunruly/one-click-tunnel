@@ -46,6 +46,7 @@ jobs:
         run: flutter --version
 
       - name: Generate platform scaffolding (windows/macos/linux runners are generated, not committed)
+        shell: bash
         run: |
           flutter create --platforms=${{ matrix.target }} --project-name oct_shell --org com.oct .
           rm -f test/widget_test.dart
