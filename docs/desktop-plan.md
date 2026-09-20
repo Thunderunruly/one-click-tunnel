@@ -6,7 +6,7 @@
 
 | 层 | 选型 | 说明 |
 |---|---|---|
-| UI 外壳 | **Flutter**（Dart） | Win/macOS/Linux 都是 GA；一套代码三平台；后面 iOS/Android 直接复用同一套 UI 做"控制端"；鸿蒙走 OpenHarmony 的 Flutter 分支 |
+| UI 外壳 | **Fyne（纯 Go）优先，PoC 不达标则转 Flutter** | Win/macOS/Linux 都是 GA；一套代码三平台；后面 iOS/Android 直接复用同一套 UI 做"控制端"；鸿蒙走 OpenHarmony 的 Flutter 分支 |
 | 核心 | 现在是现有 Node core（不改）；后续换 Go | 核心本来就只通过本地 HTTP/JSON API 对外服务，UI 只当客户端，所以"换核心"不用动 UI |
 | 通信 | 本地 HTTP API（127.0.0.1）+ token | 现有 lib/gui.js 已实现（token、同源校验、CSP）；Flutter 里就是一个 http client |
 | 隧道 | cloudflared 二进制（按平台/架构分发） | Win: cloudflared-windows-amd64.exe；macOS: darwin amd64/arm64；Linux: linux amd64/arm64 |
@@ -19,6 +19,40 @@
 | Fyne | 支持，纯 Go 一套代码 | 可用，但观感是自绘风格、渲染与生态弱于 Flutter；适合"不想引入 Dart"的场景 |
 | Wails | 支持（macOS=WKWebView，Linux=WebKitGTK） | 能直接复用现在的网页，最快，但 Linux 要打包 WebKitGTK；UI 仍是网页 |
 | **Flutter** | 支持（GA） | **推荐**：UI 质量最高、后续移动端复用、三平台一致性好；代价是引入 Dart + 包体偏大 |
+
+## 1.1 Fyne vs Flutter（只针对这个工具）
+
+| 维度 | Fyne（纯 Go） | Flutter（Dart） |
+|---|---|---|
+| 语言/进程 | UI 与核心**同一语言、同一进程**（核心换 Go 后就是**一个二进制**） | Dart UI + 核心作为 sidecar 进程（两个运行时、两次打包） |
+| 打包 | go build + fyne package：Win .exe / mac .app / Linux .deb/.rpm/AppImage | Flutter SDK 构建同样三份产物 |
+| 体积（不含 cloudflared） | 约 20-30MB（UI+核心一个文件） | 约 25-40MB（UI）再叠加核心 |
+| CI 复杂度 | 一个 Go 工具链，三平台 runner 各 build 一次 | Go/Dart **两套**工具链 + Flutter SDK（约 1GB） |
+| UI 观感/动画 | 自绘 Material 风格，够用；表格/富文本等组件更朴素 | 业界最强之一：主题、动画、HiDPI、无障碍都成熟 |
+| 中文输入法（IME） | 历史上偏弱（CJK IME 出过问题）→ **必须实测** | 成熟，中文输入没问题 |
+| Linux 依赖 | OpenGL 2.0 + X11/Wayland；无 GL 的虚拟机可能起不来 | GTK3 + OpenGL（同样依赖 GL） |
+| 托盘 | 内置 SetSystemTrayMenu（Linux 需 appindicator 或扩展） | tray_manager 插件 |
+| 未来的手机控制端 | 支持 Android/iOS 但偏实验（gomobile） | 成熟，一套代码 iOS/Android；鸿蒙有社区分支 |
+| 调试/迭代 | 一个语言一个 debugger；热重载要第三方 | 热重载极强，UI 迭代快 |
+
+**结论**
+- 若目标是「**一套语言 + 一个二进制 + 最简流水线**」，UI 不需要很花哨 → **Fyne 更合适**（核心本来要 Go，UI 与核心同进程，省掉 sidecar 和一层 HTTP 往返）
+- 若目标是「**UI 最精致 + 以后手机控制端省事**」→ **Flutter**
+- **混合（当前建议）**：桌面用 **Fyne**（Go 核心同进程），未来的 iOS/Android 控制端再单独用 Flutter/ArkTS —— API 契约已经固定，两边互不绑死
+- **两个必须先实测的风险**：① Fyne 的中文输入法（三平台各测一次输入密码/域名）；② 无 GL 的虚拟机/远程桌面能否启动
+
+## 1.2 决策前的 PoC（半天，先做再定）
+
+用 3 个 GitHub Actions runner（windows / macos / ubuntu）各 build 一份最小 Fyne 程序并跑起来，
+用数据而不是感觉来选：
+
+    最小 PoC 内容：一个窗口 + 托盘菜单 + 一个通道列表 + 一个日志滚动区 + 一个中文输入框
+    采集指标：三平台能否 build（含 cgo）、产物体积、冷启动时间、常驻内存
+    人工验证：中文输入法在该平台能否正常输入（Windows/Linux/macOS 各一次）
+             托盘图标是否出现（macOS 菜单栏、GNOME 需扩展的情形）、无 GL 环境表现
+
+若 PoC 通过（尤其 IME）→ 桌面按 Fyne 走，核心与 UI 合并成一个 Go 进程；
+若 IME 或 GL 不达标 → 转 Flutter（UI 与核心分离，架构不变，只是多一层 sidecar）。
 
 ## 2. 架构
 
