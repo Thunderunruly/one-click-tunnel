@@ -4,7 +4,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -13,10 +17,39 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
+
+// 生成一个 32x32 的托盘图标（品牌蓝圆角块 + 白色 O），避免出现"空白图标"
+func trayIcon() fyne.Resource {
+	const n = 32
+	img := image.NewRGBA(image.Rect(0, 0, n, n))
+	brand := color.NRGBA{R: 0x25, G: 0x63, B: 0xeb, A: 0xff}
+	white := color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+	for y := 0; y < n; y++ {
+		for x := 0; x < n; x++ {
+			dx, dy := x-n/2, y-n/2
+			if dx*dx+dy*dy <= (n/2-1)*(n/2-1) {
+				img.Set(x, y, brand)
+			}
+		}
+	}
+	for y := 0; y < n; y++ {
+		for x := 0; x < n; x++ {
+			dx, dy := x-n/2, y-n/2
+			d2 := dx*dx + dy*dy
+			if d2 >= 36 && d2 <= 64 {
+				img.Set(x, y, white)
+			}
+		}
+	}
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return fyne.NewStaticResource("oct-tray.png", buf.Bytes())
+}
 
 type channel struct {
 	name    string
@@ -154,8 +187,15 @@ func main() {
 
 	// 关窗口 = 隐藏到托盘（这正是我们要的行为）
 	w.SetCloseIntercept(func() {
-		w.Hide()
-		appendLog("窗口已隐藏；用托盘菜单可以再打开或退出")
+		dialog.NewCustomConfirm("关闭窗口", "最小化到托盘", "退出程序", widget.NewLabel("你想最小化到托盘继续跑，还是直接退出（会停掉所有通道）？"), func(minimize bool) {
+			if minimize {
+				w.Hide()
+				appendLog("已选择：最小化到托盘（托盘菜单可再打开）")
+			} else {
+				appendLog("已选择：退出程序")
+				a.Quit()
+			}
+		}, w).Show()
 	})
 
 	if desk, ok := a.(desktop.App); ok {
@@ -168,6 +208,7 @@ func main() {
 			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("退出（关闭所有通道）", func() { a.Quit() }),
 		)
+		desk.SetSystemTrayIcon(trayIcon())
 		desk.SetSystemTrayMenu(menu)
 		appendLog("托盘菜单已注册 —— 找任务栏右下角/顶栏菜单栏的图标（Windows 可能在 ^ 溢出区）")
 	} else {
