@@ -1,3 +1,20 @@
+## [Unreleased]
+
+### 新增 —— Flutter 桌面外壳（预览）
+- 新增 `app/flutter/`：Flutter 写的桌面外壳（Windows / macOS / Linux），只通过本地 HTTP API 与核心通信，
+  界面是纯 logo 启动页 → 通道列表 → 详情卡片（链接/参数/启动停止）→ 实时日志 → 托盘（运行时生成图标），
+  点关闭按钮弹窗二选一：最小化到托盘 / 退出程序。
+- 新增 `.github/workflows/flutter-shell.yml`：三平台自动构建并发布到预发布 `flutter-shell`（zip + SHA256SUMS）。
+  Linux runner 需要 `libayatana-appindicator3-dev`（tray_manager 的依赖），平台脚手架在 CI 里用 `flutter create` 生成。
+
+### 修复 —— CI 实际上一直在启动失败
+- `ci.yml` 里 `name: Upstream target tests (20: localhost / ...)` 未加引号，YAML 解析失败
+  → 整个 workflow 变成 startup failure（0 个 job），**所有测试其实都没在 CI 跑过**。已加引号并补上 YAML 校验。
+
+### 修复 —— Fyne PoC 发布步骤
+- `gh release create/upload` 在没有 checkout 的 publish job 里缺少 `--repo`，报 `not a git repository`，
+  PoC 构建成功却发不出去。已补 `--repo "$GITHUB_REPOSITORY"`。
+
 # 更新日志 Changelog
 
 ---
