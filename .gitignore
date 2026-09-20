@@ -10,6 +10,7 @@ cloudflared.exe
 # 运行期状态
 logs/
 state/
+updates/
 .tunnel-*.pid
 .cloudflared.pid
 config.json

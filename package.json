@@ -1,11 +1,15 @@
 {
   "name": "one-click-tunnel",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Password-gated temporary public tunnels for Windows: local config page + system tray + MCP (AI) + CLI, built on Cloudflare Quick Tunnels.",
   "license": "MIT",
   "author": "Haosheng Yao",
-  "engines": { "node": ">=20" },
-  "bin": { "one-click-tunnel": "tunnel.js" },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "one-click-tunnel": "tunnel.js"
+  },
   "scripts": {
     "start": "node tunnel.js gui --open",
     "cli": "node tunnel.js help",
@@ -19,8 +23,21 @@
     "test:live": "node security-test-live.mjs"
   },
   "keywords": [
-    "cloudflare-tunnel", "cloudflared", "quick-tunnel", "reverse-proxy", "tunneling",
-    "password-protection", "mcp", "ai-tools", "system-tray", "node-sea", "single-executable", "windows"
+    "cloudflare-tunnel",
+    "cloudflared",
+    "quick-tunnel",
+    "reverse-proxy",
+    "tunneling",
+    "password-protection",
+    "mcp",
+    "ai-tools",
+    "system-tray",
+    "node-sea",
+    "single-executable",
+    "windows"
   ],
-  "repository": { "type": "git", "url": "https://github.com/Thunderunruly/one-click-tunnel.git" }
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Thunderunruly/one-click-tunnel.git"
+  }
 }

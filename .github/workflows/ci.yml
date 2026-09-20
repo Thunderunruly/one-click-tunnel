@@ -32,7 +32,7 @@ jobs:
             node --check $_.FullName
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
-          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-exe.mjs','test-tray.mjs','build/test-installer.mjs')) {
+          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-update.mjs','test-exe.mjs','test-tray.mjs','build/test-installer.mjs')) {
             node --check $f
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
@@ -48,6 +48,9 @@ jobs:
 
       - name: MCP protocol and tools tests (27)
         run: node test-mcp.mjs
+
+      - name: Update checker tests (31)
+        run: node test-update.mjs
 
       - name: Bundled installer test (18)
         run: node build/test-installer.mjs

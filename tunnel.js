@@ -641,7 +641,8 @@ async function main() {
 
 // 子命令走 lib/cli.js（GUI / 托盘 / MCP / 多通道管理）；以 - 开头的老参数仍然是"前台单通道"模式
 const SUBCOMMANDS = ['gui', 'tray', 'mcp', 'list', 'status', 'start', 'stop', 'enable', 'disable',
-  'autostart-on', 'autostart-off', 'regen', 'add', 'rm', 'remove', 'delete', 'config', 'api', 'daemon', 'help'];
+  'autostart-on', 'autostart-off', 'regen', 'add', 'rm', 'remove', 'delete', 'config', 'api', 'daemon', 'help',
+  'update', 'version'];
 const ARGV = process.argv.slice(2);
 if (ARGV.length && !ARGV[0].startsWith('-') && SUBCOMMANDS.includes(ARGV[0])) {
   require('./lib/cli.js').run(ARGV[0], ARGV.slice(1))

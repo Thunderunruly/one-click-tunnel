@@ -41,6 +41,7 @@
   .field { display: flex; flex-direction: column; gap: 4px; }
   .field label { color: #9aa4b2; font-size: 12px; }
   pre.log { background: #0b0d11; border: 1px solid #262b36; border-radius: 10px; padding: 10px; max-height: 240px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+  .card.banner { border-color: #7f5f1d; box-shadow: 0 0 0 1px #78350f inset; }
   .toast { position: fixed; right: 18px; bottom: 18px; background: #1f2937; border: 1px solid #374151; padding: 10px 14px; border-radius: 10px; max-width: 60vw; }
   .toast.err { border-color: #7f1d1d; color: #fca5a5; }
   details summary { cursor: pointer; color: #9aa4b2; }
@@ -56,6 +57,20 @@
     <button class="primary" data-act="startAll">全部启动</button>
     <button data-act="stopAll">全部停止</button>
     <button data-act="refresh">刷新</button>
+  </div>
+
+  <div class="card banner" id="updateBar" style="display:none">
+    <div class="row">
+      <strong id="updateTitle">发现新版本</strong>
+      <span class="muted" id="updateMeta"></span>
+      <span class="grow"></span>
+      <button class="primary" data-act="updateDownload">下载安装包</button>
+      <button data-act="updateInstall">静默安装</button>
+      <button data-act="updateRelease">打开发布页</button>
+      <button data-act="updateNotes">更新说明</button>
+      <button class="ghost" data-act="updateIgnore">忽略此版本</button>
+    </div>
+    <pre class="log" id="updateNotes" style="display:none"></pre>
   </div>
 
   <div class="card">
@@ -77,10 +92,19 @@
       <div class="field"><label>托盘</label>
         <label class="row tight"><input type="checkbox" id="setTray"> 启动时最小化到托盘</label>
       </div>
+      <div class="field"><label>自动检查更新</label>
+        <label class="row tight"><input type="checkbox" id="setUpdEnabled"> 每 <input id="setUpdInterval" type="number" min="1" max="720" style="width:70px"> 小时查一次</label>
+      </div>
+      <div class="field"><label>自动下载更新包</label>
+        <label class="row tight"><input type="checkbox" id="setUpdAuto"> 发现新版本就下到 updates 目录（不自动安装）</label>
+      </div>
+      <div class="field"><label>GitHub API（被墙时可换镜像）</label><input id="setUpdApi" class="mono" placeholder="https://api.github.com"></div>
+      <div class="field"><label>下载镜像（可选，用 {url} 占位）</label><input id="setUpdMirror" class="mono" placeholder="https://mirror.example/{url}"></div>
     </div>
     <div class="row" style="margin-top:12px">
       <button class="primary" data-act="saveSettings">保存全局设置</button>
-      <span class="muted">配置页地址只在 127.0.0.1 上监听，且需要 token</span>
+      <button data-act="updateCheck">立即检查更新</button>
+      <span class="muted" id="updateStatus">配置页地址只在 127.0.0.1 上监听，且需要 token</span>
     </div>
   </div>
 
@@ -227,6 +251,33 @@
     document.getElementById('setMcp').checked = !!(state.mcp && state.mcp.enabled);
     document.getElementById('setTray').checked = !!(state.tray && state.tray.enabled);
     if (!document.getElementById('addTtl').options.length) fillTtlSelect(document.getElementById('addTtl'), d.ttl);
+    var up = state.update || {};
+    document.getElementById('setUpdEnabled').checked = up.enabled !== false;
+    document.getElementById('setUpdInterval').value = up.checkIntervalHours || 6;
+    document.getElementById('setUpdAuto').checked = !!up.autoDownload;
+    document.getElementById('setUpdApi').value = up.apiBase || 'https://api.github.com';
+    document.getElementById('setUpdMirror').value = up.downloadMirror || '';
+    var when = up.checkedAt ? new Date(up.checkedAt).toLocaleString() : '从未检查';
+    var st = '当前版本 ' + (up.currentVersion || '?') + ' · 上次检查 ' + when;
+    if (up.error) st += ' · 检查失败: ' + up.error;
+    else if (up.hasUpdate) st += ' · 有新版 ' + up.latestVersion;
+    else if (up.latestVersion) st += ' · 已是最新 (' + up.latestVersion + ')';
+    document.getElementById('updateStatus').textContent = st;
+    var bar = document.getElementById('updateBar');
+    if (up.hasUpdate) {
+      bar.style.display = '';
+      document.getElementById('updateTitle').textContent = '发现新版本 ' + up.latestVersion + '（当前 ' + up.currentVersion + '）';
+      var m = [];
+      if (up.publishedAt) m.push('发布于 ' + up.publishedAt);
+      if (up.installer) m.push('安装包 ' + up.installer.name + ' (' + (up.installer.size / 1048576).toFixed(1) + ' MB)');
+      if (up.downloaded) m.push('已下载: ' + up.downloaded.path);
+      if (up.mirror) m.push('下载镜像: ' + up.mirror);
+      document.getElementById('updateMeta').textContent = m.join(' · ');
+      var notes = document.getElementById('updateNotes');
+      if (notes.getAttribute('data-open') === '1') { notes.style.display = ''; notes.textContent = up.notes || '(没有更新说明)'; }
+    } else {
+      bar.style.display = 'none';
+    }
   }
   function refresh() { return api('/api/state').then(function (s) { state = s; render(); }).catch(function (e) { toast('读取状态失败: ' + e.message, true); }); }
 
@@ -283,6 +334,27 @@
   });
 
   document.addEventListener('click', function (ev) {
+    var uel = ev.target.closest('[data-act="updateCheck"],[data-act="updateDownload"],[data-act="updateInstall"],[data-act="updateRelease"],[data-act="updateIgnore"],[data-act="updateNotes"]');
+    if (uel) {
+      var act = uel.getAttribute('data-act');
+      var up = (state && state.update) || {};
+      if (act === 'updateRelease') { window.open(up.htmlUrl || 'https://github.com/' + (up.repo || '') + '/releases', '_blank'); return; }
+      if (act === 'updateNotes') {
+        var notes = document.getElementById('updateNotes');
+        var open = notes.getAttribute('data-open') === '1';
+        notes.setAttribute('data-open', open ? '0' : '1');
+        notes.style.display = open ? 'none' : '';
+        notes.textContent = up.notes || '(没有更新说明)';
+        return;
+      }
+      uel.disabled = true;
+      var body = { action: act === 'updateCheck' ? 'check' : act === 'updateDownload' ? 'download' : act === 'updateInstall' ? 'install' : 'ignore' };
+      if (body.action === 'ignore') body.version = up.latestVersion;
+      api('/api/update', body).then(function (r) {
+        return refresh().then(function () { toast(body.action === 'ignore' ? '已忽略 ' + up.latestVersion : '完成: ' + body.action); });
+      }).catch(function (e) { toast(e.message, true); }).then(function () { uel.disabled = false; });
+      return;
+    }
     var el = ev.target.closest('[data-act="startAll"],[data-act="stopAll"],[data-act="add"],[data-act="saveSettings"]');
     if (!el) return;
     var act = el.getAttribute('data-act');
@@ -292,7 +364,14 @@
     else if (act === 'saveSettings') p = api('/api/settings', {
       defaults: { ttl: document.getElementById('setTtl').value, passwordMode: document.getElementById('setPwMode').value, gatewayStart: Number(document.getElementById('setGwStart').value), rateLimit: Number(document.getElementById('setRateLimit').value) },
       mcp: { enabled: document.getElementById('setMcp').checked },
-      tray: { enabled: document.getElementById('setTray').checked }
+      tray: { enabled: document.getElementById('setTray').checked },
+      update: {
+        enabled: document.getElementById('setUpdEnabled').checked,
+        checkIntervalHours: Number(document.getElementById('setUpdInterval').value) || 6,
+        autoDownload: document.getElementById('setUpdAuto').checked,
+        apiBase: document.getElementById('setUpdApi').value.trim() || 'https://api.github.com',
+        downloadMirror: document.getElementById('setUpdMirror').value.trim()
+      }
     });
     else if (act === 'add') {
       var profile = {

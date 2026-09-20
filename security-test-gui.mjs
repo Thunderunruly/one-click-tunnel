@@ -107,6 +107,15 @@ async function main() {
   const dis = await req(port, 'POST', '/api/action', { headers: { 'x-tunnel-token': token, origin: 'http://127.0.0.1:' + port }, body: { action: 'disable', id: id } });
   ok('G15 停用通道会顺带把它停掉', dis.status === 200 && dis.json.profile.enabled === false && !dis.json.profiles.filter((p) => p.id === id)[0].running, dis.status);
 
+  const updNoTok = await req(port, 'GET', '/api/update');
+  ok('G16a /api/update 无 token 401', updNoTok.status === 401, updNoTok.status);
+  const updPost = await req(port, 'POST', '/api/update', { headers: { 'x-tunnel-token': token, origin: 'https://evil.example' }, body: { action: 'check' } });
+  ok('G16b 跨站 Origin 触发更新检查 403', updPost.status === 403, updPost.status);
+  const updGet = await req(port, 'GET', '/api/update', { headers: { 'x-tunnel-token': token } });
+  ok('G16c 认证后可读更新状态（离线也返回结构）', updGet.status === 200 && !!updGet.json.update && typeof updGet.json.update.currentVersion === 'string', updGet.status + ' ' + JSON.stringify(updGet.json && updGet.json.update && updGet.json.update.currentVersion));
+  const updBad = await req(port, 'POST', '/api/update', { headers: { 'x-tunnel-token': token, origin: 'http://127.0.0.1:' + port }, body: { action: 'nope' } });
+  ok('G16d 未知更新动作 400', updBad.status === 400, updBad.status);
+
   const log = await req(port, 'GET', '/api/log?id=' + encodeURIComponent(id), { headers: { 'x-tunnel-token': token } });
   ok('G16 能读取通道日志', log.status === 200 && typeof log.json.log === 'string', log.status);
 

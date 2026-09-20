@@ -44,6 +44,9 @@ function buildBundle() {
   parts.push('/* 自动生成：tunnel.js + lib/*.js + 静态资源，由 build/make-exe.mjs 生成，不要手改 */');
   parts.push("'use strict';");
   parts.push('globalThis.__PT_ASSETS = ' + JSON.stringify(assets) + ';');
+  let pkgVersion = '0.0.0';
+  try { pkgVersion = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version || '0.0.0'; } catch (e) {}
+  parts.push('globalThis.__PT_VERSION = ' + JSON.stringify(pkgVersion) + ';');
   parts.push('var __ROOT = __dirname;');
   parts.push('var __mods = {};');
   parts.push('var __cache = {};');

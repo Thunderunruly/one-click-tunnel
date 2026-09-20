@@ -57,6 +57,10 @@ The classic single-tunnel flags still work exactly as before:
       "mcp":  { "enabled": true, "allowStart": true, "allowStop": true },
       "tray": { "enabled": true },
       "defaults": { "ttl": "1h", "passwordMode": "random", "gatewayStart": 18080, "rateLimit": 3000 },
+      "update": { "enabled": true, "repo": "Thunderunruly/one-click-tunnel",
+                  "apiBase": "https://api.github.com", "checkIntervalHours": 6,
+                  "autoDownload": false, "includePrerelease": false,
+                  "downloadMirror": "", "ignoredVersion": "" },
       "profiles": [
         { "id": "web", "name": "web 5777", "enabled": true, "autoStart": false,
           "port": 5777, "gateway": 18080, "ttl": "30m",
@@ -81,6 +85,24 @@ so session keys, rate limits, lockouts and timers are isolated per tunnel.
 Tools exposed: list_tunnels, create_tunnel, start_tunnel, stop_tunnel, update_tunnel, delete_tunnel,
 set_password, tunnel_status, stop_all. Tunnels created by the AI show up in the config page and can be
 stopped by hand at any time. Use mcp.allowStart / mcp.allowStop to limit what the AI may do.
+
+## Updates
+
+The program checks the GitHub release channel for a newer version (default: every 6 hours, configurable) and shows a
+banner on the config page when one exists. You can also check on demand:
+
+    public-tunnel.exe update               # check now
+    public-tunnel.exe update --notes       # print the release notes
+    public-tunnel.exe update --download    # download the installer into updates\ (SHA-256 verified)
+    public-tunnel.exe update --install     # silently run the downloaded setup.exe
+    public-tunnel.exe version              # print the current version
+
+- Downloads are verified against the release SHA256SUMS.txt; a mismatch deletes the file and fails loudly.
+- Auto-download (never auto-install) can be enabled with update.autoDownload.
+- Behind a blocked network, point update.apiBase at a GitHub API mirror and/or set update.downloadMirror to something
+  like https://your-mirror.example/{url} -- the {url} placeholder is replaced with the real asset URL.
+- Ignore a version from the banner (it is stored as update.ignoredVersion).
+- AI hosts get the same capability through the MCP tool check_update.
 
 ## Security
 
@@ -345,3 +367,21 @@ delete_tunnel、set_password、tunnel_status、stop_all。
     node test-exe.mjs                13 项  打包后的 exe（CLI/GUI/子进程自举）
     node test-tray.mjs                9 项  托盘冒烟（需 Windows 桌面会话）
     node build/test-installer.mjs    18 项  安装器端到端
+
+
+---
+
+# 1.2 版：自动更新
+
+程序会自动从 GitHub Release 拉取版本信息并比较，发现新版就在配置页顶部弹提示条：
+
+- 默认每 6 小时检查一次（update.checkIntervalHours 可改；update.enabled=false 关闭；也可以点"立即检查更新"）
+- 提示条按钮：下载安装包 / 静默安装 / 打开发布页 / 查看更新说明 / 忽略此版本
+- 命令行：tunnel update [--notes|--download|--install|--ignore|--json]，tunnel version
+- AI：MCP 工具 check_update（可选顺便下载）
+- 安全：下载后用 release 里的 SHA256SUMS.txt 校验，SHA-256 不匹配就删除文件并报错；默认只下载不自动安装
+  （自动下载可开 update.autoDownload，静默安装只在你显式点按钮或用 --install 时执行）
+- 被墙的网络：把 update.apiBase 换成 GitHub API 镜像，把 update.downloadMirror 设成形如 https://mirror.example/{url}
+- 检查结果缓存在 state/update.json，配置页 / CLI / MCP 共用同一份，避免频繁请求（还会用 ETag 做 304 协商）
+
+    node test-update.mjs      # 31 项：检查/缓存/ETag/预发布/下载校验/镜像/忽略/各种异常路径（本地假 GitHub API，离线可跑）
