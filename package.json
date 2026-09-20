@@ -1,14 +1,14 @@
 {
   "name": "one-click-tunnel",
-  "version": "1.5.3",
-  "description": "Password-gated temporary public tunnels for Windows: local config page + system tray + MCP (AI) + CLI, built on Cloudflare Quick Tunnels.",
+  "version": "1.6.0",
+  "description": "OCT (One Click Tunnel) — password-gated temporary public tunnels for Windows: GUI + tray + CLI + MCP, localhost or LAN device targets, named tunnels with your own domain.",
   "license": "MIT",
   "author": "Haosheng Yao",
   "engines": {
     "node": ">=20"
   },
   "bin": {
-    "one-click-tunnel": "tunnel.js"
+    "oct": "tunnel.js"
   },
   "scripts": {
     "start": "node tunnel.js gui --open",

@@ -2,6 +2,16 @@
 
 ---
 
+# 1.6.0：统一命名 —— OCT（One Click Tunnel）
+
+- 项目名 = 仓库名 = `one-click-tunnel`；中文名统一成 **一键隧道**（不再叫"临时公网映射小工具"）
+- 引擎/命令行改名为 `oct`（`oct --port 3000`、`oct gui`、`oct mcp`…），可执行文件 `public-tunnel.exe` → `oct.exe`
+- 用户点的那一层仍然是 `one-click-tunnel.exe`（无控制台启动器），跟库名一致
+- 升级兼容：启动器找不到 `oct.exe` 时会回退找旧的 `public-tunnel.exe`，从 1.5.x 覆盖安装不会出现"点了快捷方式打不开"
+- 安装目录（%LOCALAPPDATA%\one-click-tunnel）、config.json 结构、通道/域名/密码全部不变，无需迁移
+
+---
+
 # 1.5.3：局域网设备映射（--target）+ 修更新提示自相矛盾
 
 1. 上游目标可指定为局域网设备：tunnel --target 192.168.1.50:8080 / tunnel add --name nas --port 5000 --target 192.168.1.50:5000；
@@ -19,7 +29,7 @@
 # 1.5.2：原生无控制台启动器（不再依赖 VBScript）
 
 - 新增 build/launcher/Launcher.cs + build/make-launcher.mjs：用系统自带 csc.exe 编译出
-  dist/one-click-tunnel.exe（GUI 子系统，约 7KB）。启动时隐藏调起 public-tunnel.exe app，
+  dist/one-click-tunnel.exe（GUI 子系统，约 7KB）。启动时隐藏调起 oct.exe app，
   完全不会弹命令行窗口，也不依赖 VBScript（微软正在弃用 VBScript，Win11 24H2 起是可选功能）
 - 快捷方式改为指向它：桌面/开始菜单 = one-click-tunnel.exe；另有「全部关闭」= one-click-tunnel.exe --stop-all
 - 安装脚本 / Inno Setup / 开机自启 全部改用原生启动器；launch.vbs、stop-all.vbs 已删除
@@ -152,8 +162,8 @@ Release notes are written in Chinese; per-release notes (download + SHA-256 veri
 
     {
       "mcpServers": {
-        "public-tunnel": {
-          "command": "C:\\Users\\<你>\\AppData\\Local\\public-tunnel\\public-tunnel.exe",
+        "one-click-tunnel": {
+          "command": "C:\\Users\\<你>\\AppData\\Local\\one-click-tunnel\\oct.exe",
           "args": ["mcp"]
         }
       }

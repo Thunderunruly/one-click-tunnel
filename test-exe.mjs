@@ -1,5 +1,5 @@
 // 打包产物（exe）端到端测试：三种前端（CLI 子命令 / GUI 守护进程 / 子进程自启动）都能用
-// 用法: node test-exe.mjs            （默认测 dist/public-tunnel.exe）
+// 用法: node test-exe.mjs            （默认测 dist/oct.exe）
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,7 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const EXE = process.env.TUNNEL_ENTRY ? path.resolve(HERE, process.env.TUNNEL_ENTRY) : path.join(HERE, 'dist', 'public-tunnel.exe');
+const EXE = process.env.TUNNEL_ENTRY ? path.resolve(HERE, process.env.TUNNEL_ENTRY) : path.join(HERE, 'dist', 'oct.exe');
 let passCount = 0;
 const failures = [];
 function ok(name, cond, detail) {
@@ -87,7 +87,7 @@ async function main() {
     const r = spawnSync('tasklist', ['/FI', 'PID eq ' + childPid, '/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true });
     img = ((r.stdout || '').match(/^"([^"]+)"/m) || [])[1] || '';
   } catch (e) {}
-  ok('E8 子进程就是打包后的 exe 自己（自举成功）', img.toLowerCase().indexOf('public-tunnel') >= 0 || process.platform !== 'win32', 'pid=' + childPid + ' img=' + img);
+  ok('E8 子进程就是打包后的 exe 自己（自举成功）', /oct|one-click-tunnel/i.test(img) || process.platform !== 'win32', 'pid=' + childPid + ' img=' + img);
 
   const stopped = await req(port, 'POST', '/api/action', { 'x-tunnel-token': token, origin: 'http://127.0.0.1:' + port }, { action: 'stop', id: id });
   ok('E9 exe 能停通道', stopped.status === 200 && !stopped.json.status.running, stopped.status);

@@ -1,5 +1,5 @@
 ﻿<#
-  临时公网映射 托盘图标（Windows 自带 WinForms，无第三方依赖）
+  一键隧道 托盘图标（Windows 自带 WinForms，无第三方依赖）
   由 tunnel tray 调用：powershell -File tray.ps1 -GuiPort 18400 -Token xxx
 #>
 param(
@@ -37,10 +37,10 @@ function Post-Action($action, $id) {
 }
 
 $script:notify = New-Object System.Windows.Forms.NotifyIcon
-$script:notify.Text = '临时公网映射'
+$script:notify.Text = '一键隧道'
 $icon = $null
 try {
-  $exe = Join-Path (Split-Path -Parent $PSScriptRoot) 'public-tunnel.exe'
+  $exe = Join-Path (Split-Path -Parent $PSScriptRoot) 'oct.exe'
   if (Test-Path $exe) { $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe) }
 } catch {}
 if (-not $icon) { $icon = [System.Drawing.SystemIcons]::Application }
@@ -63,11 +63,11 @@ $script:balloon = {
 }
 
 $miOpen.add_Click({ try { Start-Process $guiUrl } catch {} })
-$miStartAll.add_Click({ $ok = Post-Action 'startAll' $null; & $script:balloon '临时公网映射' ($(if ($ok) { '已启动所有启用的通道' } else { '启动失败，请打开配置页查看' })) })
-$miStopAll.add_Click({ $ok = Post-Action 'stopAll' $null; & $script:balloon '临时公网映射' ($(if ($ok) { '已停止所有通道' } else { '停止失败' })) })
+$miStartAll.add_Click({ $ok = Post-Action 'startAll' $null; & $script:balloon '一键隧道' ($(if ($ok) { '已启动所有启用的通道' } else { '启动失败，请打开配置页查看' })) })
+$miStopAll.add_Click({ $ok = Post-Action 'stopAll' $null; & $script:balloon '一键隧道' ($(if ($ok) { '已停止所有通道' } else { '停止失败' })) })
 $miStatus.add_Click({
   $st = Get-State
-  if (-not $st) { & $script:balloon '临时公网映射' '守护进程没有响应'; return }
+  if (-not $st) { & $script:balloon '一键隧道' '守护进程没有响应'; return }
   $run = @($st.profiles | Where-Object { $_.running })
   $lines = @()
   foreach ($p in $run) { $lines += ($p.name + ': ' + $p.url) }
@@ -102,13 +102,13 @@ $timer.add_Tick({
   if (-not $st) {
     $script:misses = $script:misses + 1
     if ($script:misses -ge 3) { Exit-Tray; return }
-    $script:notify.Text = '临时公网映射：后台服务未响应'
+    $script:notify.Text = '一键隧道：后台服务未响应'
     return
   }
   $script:misses = 0
-  if (-not $st) { $script:notify.Text = '临时公网映射：守护进程未响应'; return }
+  if (-not $st) { $script:notify.Text = '一键隧道：守护进程未响应'; return }
   $run = @($st.profiles | Where-Object { $_.running })
-  $tip = '临时公网映射：' + $run.Count + ' 个运行中 / 共 ' + @($st.profiles).Count + ' 个通道'
+  $tip = '一键隧道：' + $run.Count + ' 个运行中 / 共 ' + @($st.profiles).Count + ' 个通道'
   if ($run.Count -eq 1 -and $run[0].url) { $tip += [Environment]::NewLine + $run[0].url }
   if ($tip.Length -gt 120) { $tip = $tip.Substring(0, 120) }
   $script:notify.Text = $tip

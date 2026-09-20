@@ -31,8 +31,8 @@ function findIscc() {
 }
 
 if (!fs.existsSync(ISS)) { console.error('缺少 ' + ISS); process.exit(strict ? 1 : 0); }
-if (!fs.existsSync(path.join(ROOT, 'dist', 'public-tunnel.exe'))) {
-  console.error('dist/public-tunnel.exe 不存在，先运行 node build/make-exe.mjs');
+if (!fs.existsSync(path.join(ROOT, 'dist', 'oct.exe'))) {
+  console.error('dist/oct.exe 不存在，先运行 node build/make-exe.mjs');
   process.exit(1);
 }
 const version = versionOf();

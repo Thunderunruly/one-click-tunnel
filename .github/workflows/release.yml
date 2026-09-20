@@ -76,7 +76,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force release | Out-Null
           $lines = @()
-          $targets = @('dist/public-tunnel.exe','dist/cloudflared.exe')
+          $targets = @('dist/oct.exe','dist/cloudflared.exe')
           $targets += @(Get-ChildItem release/*.zip, release/*setup*.exe -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
           foreach ($f in $targets) {
             $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
@@ -95,9 +95,9 @@ jobs:
           Write-Host "install dir: $dir"
           $p = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR=' + $dir) -PassThru -Wait
           if ($p.ExitCode -ne 0) { throw "install failed with exit code $($p.ExitCode)" }
-          if (-not (Test-Path (Join-Path $dir 'public-tunnel.exe'))) { throw 'public-tunnel.exe missing after install' }
+          if (-not (Test-Path (Join-Path $dir 'oct.exe'))) { throw 'oct.exe missing after install' }
           if (-not (Test-Path (Join-Path $dir 'cloudflared.exe'))) { throw 'cloudflared.exe missing after install' }
-          & (Join-Path $dir 'public-tunnel.exe') help | Out-Host
+          & (Join-Path $dir 'oct.exe') help | Out-Host
           if ($LASTEXITCODE -ne 0) { throw 'installed exe cannot run' }
           $unins = Join-Path $dir 'unins000.exe'
           if (Test-Path $unins) {
@@ -105,7 +105,7 @@ jobs:
             if ($u.ExitCode -ne 0) { throw "uninstall failed with exit code $($u.ExitCode)" }
           }
           Start-Sleep -Seconds 2
-          if (Test-Path (Join-Path $dir 'public-tunnel.exe')) { throw 'files still present after uninstall' }
+          if (Test-Path (Join-Path $dir 'oct.exe')) { throw 'files still present after uninstall' }
           Write-Host 'install / uninstall check passed'
 
       - name: Publish release
@@ -129,7 +129,7 @@ jobs:
             '',
             'After install, launch the shortcut: it opens the local config page (background daemon + tray icon).',
             'You can run many tunnels at once, each with its own password and expiry time.',
-            'AI integration: point your MCP host at public-tunnel.exe with the argument mcp.',
+            'AI integration: point your MCP host at oct.exe with the argument mcp.',
             '',
             'Verify downloads against SHA256SUMS.txt.'
           ) -join [Environment]::NewLine

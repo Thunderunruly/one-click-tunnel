@@ -83,7 +83,7 @@ console.log('  cloudflared RSS: ' + (Math.round(Number((cfRss.stdout || '0').tri
 
 console.log('\n== 冷启动 / 体积 ==');
 for (const [label, cmd, args] of [['node tunnel.js --help', process.execPath, [path.join(ROOT, 'tunnel.js'), '--help']],
-  ['dist/public-tunnel.exe --help', path.join(ROOT, 'dist', 'public-tunnel.exe'), ['--help']]]) {
+  ['dist/oct.exe --help', path.join(ROOT, 'dist', 'oct.exe'), ['--help']]]) {
   const times = [];
   for (let i = 0; i < 3; i++) {
     const t0 = Date.now();
@@ -94,7 +94,7 @@ for (const [label, cmd, args] of [['node tunnel.js --help', process.execPath, [p
 }
 const fs = await import('node:fs');
 const sz = (p) => { try { return (fs.statSync(p).size / 1048576).toFixed(1) + ' MB'; } catch (e) { return '-'; } };
-console.log('  public-tunnel.exe             : ' + sz(path.join(ROOT, 'dist', 'public-tunnel.exe')));
+console.log('  oct.exe             : ' + sz(path.join(ROOT, 'dist', 'oct.exe')));
 console.log('  cloudflared.exe               : ' + sz(path.join(ROOT, 'dist', 'cloudflared.exe')));
 const zip = fs.readdirSync(path.join(ROOT, 'release')).filter((f) => f.endsWith('.zip')).pop();
 console.log('  便携安装包 zip                : ' + sz(path.join(ROOT, 'release', zip)));

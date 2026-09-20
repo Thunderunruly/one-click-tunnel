@@ -1,5 +1,5 @@
 ﻿<#
-  临时公网映射 卸载脚本（只清理当前用户目录 + HKCU，不需要管理员）
+  一键隧道 卸载脚本（只清理当前用户目录 + HKCU，不需要管理员）
 #>
 param(
   [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'public-tunnel'),
@@ -7,7 +7,7 @@ param(
 )
 $ErrorActionPreference = 'Continue'
 function Say($msg) { if (-not $Quiet) { Write-Host $msg } }
-Say '正在卸载 临时公网映射...'
+Say '正在卸载 一键隧道...'
 
 $procs = Get-Process -Name 'public-tunnel' -ErrorAction SilentlyContinue
 foreach ($p in $procs) { try { $p | Stop-Process -Force } catch {} }
@@ -29,8 +29,8 @@ foreach ($f in $pidFiles) {
 }
 
 foreach ($t in @(
-  (Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs') '临时公网映射.lnk'),
-  (Join-Path ([Environment]::GetFolderPath('Desktop')) '临时公网映射.lnk')
+  (Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs') '一键隧道.lnk'),
+  (Join-Path ([Environment]::GetFolderPath('Desktop')) '一键隧道.lnk')
 )) {
   if (Test-Path $t) { Remove-Item $t -Force; Say ('  已删除快捷方式 ' + $t) }
 }

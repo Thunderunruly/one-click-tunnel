@@ -1,4 +1,4 @@
-# 临时公网映射 public-tunnel（免安装 exe 版）
+# 一键隧道 OCT（one-click-tunnel）— 免安装 exe 版
 
 > English documentation: https://github.com/Thunderunruly/one-click-tunnel#readme
 > English changelog: https://github.com/Thunderunruly/one-click-tunnel/blob/main/CHANGELOG.md
@@ -10,14 +10,14 @@
 
 1. 把整个文件夹解压到任意位置（例如桌面上的一个文件夹）
 2. 双击 install.cmd
-3. 装完后桌面/开始菜单会出现「临时公网映射」，双击即用
+3. 装完后桌面/开始菜单会出现「一键隧道」，双击即用
 
-安装位置：%LOCALAPPDATA%\public-tunnel （约 135 MB：exe + cloudflared）
+安装位置：%LOCALAPPDATA%\one-click-tunnel （约 135 MB：exe + cloudflared）
 卸载：双击安装目录里的 uninstall.cmd，或在「设置 → 应用」里卸载（不留残留）
 
 ## 使用
 
-双击「临时公网映射」后，窗口里会显示：
+双击「一键隧道」后，窗口里会显示：
 
 - 临时公网地址：https://xxxx-xxxx.trycloudflare.com
 - 访问密码：随机生成（也可以自己指定）
@@ -25,12 +25,12 @@
 
 把地址 + 密码发给对方即可。对方第一次打开要先输入密码。
 
-也可以命令行运行（参数见 public-tunnel.exe --help）：
+也可以命令行运行（参数见 oct.exe --help）：
 
-    public-tunnel.exe                         把 127.0.0.1:3000 映射出去，1 小时，随机密码
-    public-tunnel.exe --port 8090 --ttl 30m   映射 8090 端口，30 分钟
-    public-tunnel.exe --port 3081 --ttl 6h --password 自定义密码
-    public-tunnel.exe --no-tunnel             只起本地密码门，不建公网隧道（排障用）
+    oct.exe                         把 127.0.0.1:3000 映射出去，1 小时，随机密码
+    oct.exe --port 8090 --ttl 30m   映射 8090 端口，30 分钟
+    oct.exe --port 3081 --ttl 6h --password 自定义密码
+    oct.exe --no-tunnel             只起本地密码门，不建公网隧道（排障用）
 
 关闭方式：到点自动关闭 / 窗口里 Ctrl+C / 双击 stop.cmd
 

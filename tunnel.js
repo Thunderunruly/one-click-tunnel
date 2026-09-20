@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 临时公网映射小工具（Cloudflare Quick Tunnel + 密码门 + 定时自动关闭）
+ * 一键隧道小工具（Cloudflare Quick Tunnel + 密码门 + 定时自动关闭）
  *
  * 用法：
  *   node tunnel.js                       # 默认把 3000 映射出去，1 小时后自动关闭，自动生成密码

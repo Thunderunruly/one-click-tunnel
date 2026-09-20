@@ -10,7 +10,7 @@ const DIST = path.join(ROOT, 'dist');
 const OUTDIR = path.join(ROOT, 'release');
 const STAGE = path.join(ROOT, 'build', '_zipstage');
 
-const REQUIRED = ['public-tunnel.exe', 'one-click-tunnel.exe', 'install.cmd', 'install.ps1'];
+const REQUIRED = ['oct.exe', 'one-click-tunnel.exe', 'install.cmd', 'install.ps1'];
 const OPTIONAL = ['cloudflared.exe', 'uninstall.cmd', 'uninstall.ps1', 'start.cmd', 'tray.cmd', 'stop-all.cmd', 'stop.cmd', 'README.md'];
 
 const pkg = (() => {

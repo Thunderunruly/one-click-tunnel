@@ -4,7 +4,7 @@
   #define MyAppVersion "1.1.0"
 #endif
 #define MyAppName "one-click-tunnel"
-#define MyAppExeName "public-tunnel.exe"
+#define MyAppExeName "oct.exe"
 
 [Setup]
 AppId={{7C3B1C9A-6C2E-4B7F-9A1D-2F5E8C4B7A31}
@@ -38,7 +38,7 @@ Source: "..\dist\one-click-tunnel.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{userprograms}\one-click-tunnel"; Filename: "{app}\one-click-tunnel.exe"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Comment: "临时公网映射（桌面窗口 + 托盘，无命令行弹窗）"
+Name: "{userprograms}\one-click-tunnel"; Filename: "{app}\one-click-tunnel.exe"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Comment: "一键隧道（桌面窗口 + 托盘，无命令行弹窗）"
 Name: "{userprograms}\one-click-tunnel 全部关闭"; Filename: "{app}\one-click-tunnel.exe"; Parameters: "--stop-all"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Comment: "关闭所有通道与后台进程"
 Name: "{userdesktop}\one-click-tunnel"; Filename: "{app}\one-click-tunnel.exe"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 

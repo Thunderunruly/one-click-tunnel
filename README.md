@@ -1,4 +1,7 @@
-# one-click-tunnel
+# one-click-tunnel (OCT)
+
+> **OCT = One Click Tunnel.** Publish a port from this machine **or from a LAN device** to a temporary public URL,
+> behind a password gate, with a native window + tray, a CLI and an MCP server.
 
 [![CI](https://github.com/Thunderunruly/one-click-tunnel/actions/workflows/ci.yml/badge.svg)](https://github.com/Thunderunruly/one-click-tunnel/actions/workflows/ci.yml)
 [![Release](https://github.com/Thunderunruly/one-click-tunnel/actions/workflows/release.yml/badge.svg)](https://github.com/Thunderunruly/one-click-tunnel/actions/workflows/release.yml)
@@ -33,32 +36,32 @@ Verify your download against SHA256SUMS.txt in the release assets.
 ## Four ways to start / manage tunnels
 
     # 1. graphical config page + tray (recommended)
-    public-tunnel.exe gui --open
+    oct.exe gui --open
 
     # 2. tray only (background daemon is started automatically)
-    public-tunnel.exe tray
+    oct.exe tray
 
     # 3. command line, many tunnels
-    public-tunnel.exe add --name web --port 3000 --ttl 1h --auto-start
-    public-tunnel.exe start web
-    public-tunnel.exe list
-    public-tunnel.exe stop --all
+    oct.exe add --name web --port 3000 --ttl 1h --auto-start
+    oct.exe start web
+    oct.exe list
+    oct.exe stop --all
 
     # 4. MCP: let an AI host drive it
-    public-tunnel.exe mcp
+    oct.exe mcp
 
 The classic single-tunnel flags still work exactly as before:
 
-    public-tunnel.exe --port 3000 --ttl 1h --password mypassword
+    oct.exe --port 3000 --ttl 1h --password mypassword
 
 ## Permanent address with your own domain (named tunnels)
 
 Quick tunnels give you a random `*.trycloudflare.com` address that changes on every run. If you own a domain
 managed by Cloudflare, you can give a tunnel a **permanent** address instead:
 
-    public-tunnel.exe login                        # one browser authorization (pick the domain/zone)
-    public-tunnel.exe domain web app.example.com   # creates the named tunnel + the DNS record
-    public-tunnel.exe start web                    # now serving https://app.example.com, permanently
+    oct.exe login                        # one browser authorization (pick the domain/zone)
+    oct.exe domain web app.example.com   # creates the named tunnel + the DNS record
+    oct.exe start web                    # now serving https://app.example.com, permanently
 
 - `tunnel login` stores the origin certificate in `state/cloudflare/cert.pem` (once per account).
 - `tunnel domain <id> <hostname>` creates the tunnel, copies its credentials into `state/cloudflare/` and
@@ -88,11 +91,11 @@ daemon starts a tiny Windows process (PowerShell WinForms, no extra dependency) 
 
 - Windows 11 hides new tray icons by default: click the **^** (show hidden icons) next to the clock, or open
   Settings -> Personalization -> Taskbar -> Other system tray icons and switch the
-  "one-click-tunnel / 临时公网映射" entry on to keep it visible.
+  "one-click-tunnel / 一键隧道" entry on to keep it visible.
 - The icon only lives while the daemon runs. In 1.2.x the daemon lived in the console window, so closing that
   window killed the tray as well. From 1.3.0 the launcher is windowless and the daemon is detached, so closing
   the app window keeps the tunnels **and** the tray alive.
-- Start it manually any time: public-tunnel.exe tray  (reuses the running daemon; exits if one is already there)
+- Start it manually any time: oct.exe tray  (reuses the running daemon; exits if one is already there)
 - Turn it off: config page -> Global settings -> Tray, or tray.enabled=false in config.json.
 - If the daemon dies, the tray closes itself within ~10 seconds (watchdog), so no ghost icons are left behind.
 
@@ -104,8 +107,8 @@ does **not** stop the tunnels - the tray icon stays, and the tray menu (or the "
 which runs stop-all.vbs) quits everything. No cmd window appears: the shortcut runs a .vbs launcher and the
 daemon is spawned detached and hidden.
 
-    public-tunnel.exe app             # open the desktop window (starts the daemon when needed)
-    public-tunnel.exe gui --browser   # use a normal browser tab instead of the app window
+    oct.exe app             # open the desktop window (starts the daemon when needed)
+    oct.exe gui --browser   # use a normal browser tab instead of the app window
 
 ## Config file (config.json, next to the exe)
 
@@ -134,7 +137,7 @@ so session keys, rate limits, lockouts and timers are isolated per tunnel.
     {
       "mcpServers": {
         "one-click-tunnel": {
-          "command": "C:\\Users\\<you>\\AppData\\Local\\one-click-tunnel\\public-tunnel.exe",
+          "command": "C:\\Users\\<you>\\AppData\\Local\\one-click-tunnel\\oct.exe",
           "args": ["mcp"]
         }
       }
@@ -149,11 +152,11 @@ stopped by hand at any time. Use mcp.allowStart / mcp.allowStop to limit what th
 The program checks the GitHub release channel for a newer version (default: every 6 hours, configurable) and shows a
 banner on the config page when one exists. You can also check on demand:
 
-    public-tunnel.exe update               # check now
-    public-tunnel.exe update --notes       # print the release notes
-    public-tunnel.exe update --download    # download the installer into updates\ (SHA-256 verified)
-    public-tunnel.exe update --install     # silently run the downloaded setup.exe
-    public-tunnel.exe version              # print the current version
+    oct.exe update               # check now
+    oct.exe update --notes       # print the release notes
+    oct.exe update --download    # download the installer into updates\ (SHA-256 verified)
+    oct.exe update --install     # silently run the downloaded setup.exe
+    oct.exe version              # print the current version
 
 - Downloads are verified against the release SHA256SUMS.txt; a mismatch deletes the file and fails loudly.
 - Auto-download (never auto-install) can be enabled with update.autoDownload.
@@ -183,7 +186,7 @@ Verified by re-runnable suites (offline unless noted):
 
     git clone https://github.com/Thunderunruly/one-click-tunnel.git
     cd one-click-tunnel
-    node build/make-exe.mjs       # dist/public-tunnel.exe (single file, Node SEA)
+    node build/make-exe.mjs       # dist/oct.exe (single file, Node SEA)
     node build/make-zip.mjs       # release/one-click-tunnel-<version>-win-x64.zip
     node build/make-setup.mjs     # release/one-click-tunnel-setup-<version>.exe (needs Inno Setup 6)
 
@@ -216,7 +219,7 @@ workload ever reaches these numbers, revisit the decision with data.
 
 The desktop/Start-Menu shortcut points at `one-click-tunnel.exe` - a ~7 KB native launcher compiled from
 build/launcher/Launcher.cs with the csc.exe that ships with Windows. It is a **GUI-subsystem** binary
-(PE Subsystem=2), so it starts `public-tunnel.exe app` hidden and exits immediately: **no console window flashes**.
+(PE Subsystem=2), so it starts `oct.exe app` hidden and exits immediately: **no console window flashes**.
 It also removed the old VBScript launcher, which matters because Microsoft is deprecating VBScript
 (optional feature since Windows 11 24H2). Rebuild it with `node build/make-launcher.mjs`.
 
@@ -225,8 +228,8 @@ It also removed the old VBScript launcher, which matters because Microsoft is de
 By default the tunnel points at `127.0.0.1:<port>`. To publish another machine on your network - a NAS, a camera, a
 printer web UI, a server on the LAN - set the target explicitly:
 
-    public-tunnel.exe --target 192.168.1.50:8080 --ttl 1h
-    public-tunnel.exe add --name nas --port 5000 --target 192.168.1.50:5000
+    oct.exe --target 192.168.1.50:8080 --ttl 1h
+    oct.exe add --name nas --port 5000 --target 192.168.1.50:5000
 
 - Allowed by default: loopback, 10/8, 172.16/12, 192.168/16, fc00::/7 and hostnames that resolve to them.
 - **Refused by default**: public IPs, 0.0.0.0/::, multicast and link-local (169.254.x.x, incl. 169.254.169.254),

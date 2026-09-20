@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const BUILD = path.join(ROOT, 'build');
 const DIST = path.join(ROOT, 'dist');
-const OUT = path.join(DIST, 'public-tunnel.exe');
+const OUT = path.join(DIST, 'oct.exe');
 const BUNDLE = path.join(BUILD, 'bundle.cjs');
 const SENTINEL = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
 
@@ -91,6 +91,11 @@ for (const f of ['install.cmd', 'install.ps1', 'uninstall.cmd', 'uninstall.ps1',
   if (fs.existsSync(s)) fs.copyFileSync(s, path.join(DIST, f));
 }
 run(process.execPath, [path.join(ROOT, 'build', 'make-launcher.mjs')]);
+
+// 清掉旧名字的引擎（1.5.x 叫 public-tunnel.exe），避免发布包里同时躺着两个
+for (const f of fs.readdirSync(DIST)) {
+  if (/^public-tunnel.*\.exe$/i.test(f)) { try { fs.rmSync(path.join(DIST, f), { force: true }); console.log('已清理旧文件: dist/' + f); } catch (e) {} }
+}
 
 // RUNTIME_JUNK：清掉 dist 里的运行期文件（配置/日志/状态/pid），它们不该进发布包
 for (const junk of ['config.json', 'logs', 'state', 'updates']) {

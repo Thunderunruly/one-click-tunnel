@@ -76,7 +76,7 @@ async function main() {
   const page401 = await req(port, 'GET', '/');
   ok('G5 无 token 打开配置页 401', page401.status === 401, page401.status);
   const page = await req(port, 'GET', '/?token=' + token);
-  ok('G6 带 token 打开配置页 200', page.status === 200 && page.body.indexOf('临时公网映射') >= 0, page.status);
+  ok('G6 带 token 打开配置页 200', page.status === 200 && page.body.indexOf('一键隧道') >= 0, page.status);
   ok('G6b 配置页下发 HttpOnly + SameSite=Strict Cookie', /pt_token=[A-Za-z0-9_-]+/.test(String(page.headers['set-cookie'] || '')) && String(page.headers['set-cookie']).toLowerCase().indexOf('httponly') >= 0 && String(page.headers['set-cookie']).toLowerCase().indexOf('samesite=strict') >= 0, String(page.headers['set-cookie']).slice(0, 90));
   ok('G6c 配置页有 CSP 且禁止 frame/外链脚本', String(page.headers['content-security-policy'] || '').indexOf("default-src 'none'") >= 0 && String(page.headers['x-frame-options']) === 'DENY', String(page.headers['content-security-policy']).slice(0, 60));
   ok('G6d 配置页不引用任何外部资源', !/src="https?:|href="https?:/.test(page.body));

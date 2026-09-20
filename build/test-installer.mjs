@@ -16,8 +16,8 @@ const REG_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\
 let passCount = 0;
 const failures = [];
 // CI 里 dist/ 是不存在的，先自己构建一次；没有 cloudflared.exe 时相关检查自动跳过
-if (!fs.existsSync(path.join(DIST, 'public-tunnel.exe'))) {
-  console.log('dist/public-tunnel.exe 不存在，先运行 build/make-exe.mjs 构建...');
+if (!fs.existsSync(path.join(DIST, 'oct.exe'))) {
+  console.log('dist/oct.exe 不存在，先运行 build/make-exe.mjs 构建...');
   const b = spawnSync(process.execPath, [path.join(ROOT, 'build', 'make-exe.mjs')], { cwd: ROOT, stdio: 'inherit', windowsHide: true });
   if (b.status !== 0) { console.error('构建失败，退出码 ' + b.status); process.exit(1); }
 }
@@ -57,11 +57,11 @@ async function main() {
   const inst = ps('& "' + path.join(DIST, 'install.ps1') + '" -InstallDir "' + INSTALL + '" -ShortcutDir "' + SHORTCUTS + '" -NoLaunch');
   ok('I1 安装脚本执行成功', inst.indexOf('安装完成') >= 0, inst.slice(-300));
 
-  for (const f of ['public-tunnel.exe', 'cloudflared.exe', 'start.cmd', 'stop.cmd', 'uninstall.cmd', 'uninstall.ps1', 'README.md']) {
+  for (const f of ['oct.exe', 'cloudflared.exe', 'start.cmd', 'stop.cmd', 'uninstall.cmd', 'uninstall.ps1', 'README.md']) {
     if (f === 'cloudflared.exe' && !HAS_CLOUDFLARED) { ok('I2 已安装 ' + f + '（dist 里没有该文件，跳过）', true); continue; }
     ok('I2 已安装 ' + f, fs.existsSync(path.join(INSTALL, f)));
   }
-  const lnk = path.join(SHORTCUTS, '临时公网映射.lnk');
+  const lnk = path.join(SHORTCUTS, '一键隧道.lnk');
   const shortcutUnsupported = /不支持创建快捷方式|快捷方式创建失败/.test(inst);
   if (shortcutUnsupported) {
     ok('I3 快捷方式（该环境无桌面会话 / COM 不可用，已按预期跳过）', true, '');
@@ -75,9 +75,9 @@ async function main() {
   }
   const rq = regQuery();
   const rqUtf8 = ps('if (Test-Path "' + REG_KEY.replace('HKCU\\', 'HKCU:\\') + '") { (Get-ItemProperty "' + REG_KEY.replace('HKCU\\', 'HKCU:\\') + '").DisplayName }');
-  ok('I4 注册表卸载项已写入（含中文名称）', rq.code === 0 && rqUtf8.indexOf('临时公网映射') >= 0, rq.code + ' / ' + rqUtf8);
+  ok('I4 注册表卸载项已写入（含中文名称）', rq.code === 0 && rqUtf8.indexOf('一键隧道') >= 0, rq.code + ' / ' + rqUtf8);
 
-  const exe = path.join(INSTALL, 'public-tunnel.exe');
+  const exe = path.join(INSTALL, 'oct.exe');
   if (!HAS_CLOUDFLARED) {
     ok('I5/I6 真隧道相关检查（dist 里没有 cloudflared.exe，跳过）', true);
     const unin0 = ps('& "' + path.join(INSTALL, 'uninstall.ps1') + '" -InstallDir "' + INSTALL + '" -Quiet');

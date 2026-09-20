@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const NODE = process.execPath;
-// 设 TUNNEL_ENTRY=dist\\public-tunnel.exe 可以对打包后的 exe 跑同一套 MCP 测试
+// 设 TUNNEL_ENTRY=dist\\oct.exe 可以对打包后的 exe 跑同一套 MCP 测试
 const TUNNEL = process.env.TUNNEL_ENTRY ? path.resolve(HERE, process.env.TUNNEL_ENTRY) : path.join(HERE, 'tunnel.js');
 const PACKAGED = TUNNEL.toLowerCase().endsWith('.exe');
 const TOOL_DIR = path.dirname(TUNNEL);

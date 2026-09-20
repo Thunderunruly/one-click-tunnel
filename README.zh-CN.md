@@ -1,4 +1,6 @@
-# 临时公网映射小工具（public-tunnel）
+# 一键隧道 OCT（one-click-tunnel）
+
+> OCT = One Click Tunnel。把**本机或局域网设备**的端口临时映射到公网，带密码门、桌面窗口 + 托盘、CLI 和 MCP。
 
 [English](README.md) · [更新日志](CHANGELOG.md) · [下载最新版](https://github.com/Thunderunruly/one-click-tunnel/releases/latest)
 
@@ -112,8 +114,8 @@ node tunnel.js --port 3000 --ttl 1h --password 你的密码
   node:path / node:child_process 等内置模块，零第三方依赖。
 - 因此用官方 Node SEA（Single Executable Application）打包成免安装单文件 exe，不需要 pkg / electron：
 
-      node build\make-exe.mjs     # dist\public-tunnel.exe (83 MB) + dist\cloudflared.exe (52 MB) + 安装脚本
-      node build\make-zip.mjs     # release\public-tunnel-win-x64-1.0.0.zip (49 MB)，解压双击 install.cmd 即可
+      node build\make-exe.mjs     # dist\oct.exe (83 MB) + dist\cloudflared.exe (52 MB) + 安装脚本
+      node build\make-zip.mjs     # release\one-click-tunnel-win-x64-1.0.0.zip (49 MB)，解压双击 install.cmd 即可
 
 - 打包后 __dirname 指向虚拟快照，脚本自动改用 path.dirname(process.execPath) 定位 cloudflared.exe /
   logs / pid 文件（用 node:sea 的 isSea() 判定，同时兼容 pkg 的 process.pkg）。
@@ -121,7 +123,7 @@ node tunnel.js --port 3000 --ttl 1h --password 你的密码
 ## 一键安装（免管理员）
 
 1. 解压 zip，双击 install.cmd
-2. 装到 %LOCALAPPDATA%\public-tunnel，创建桌面 + 开始菜单快捷方式，并写入 HKCU 卸载项（「设置 → 应用」可卸载）
+2. 装到 %LOCALAPPDATA%\one-click-tunnel，创建桌面 + 开始菜单快捷方式，并写入 HKCU 卸载项（「设置 → 应用」可卸载）
 3. 卸载：uninstall.cmd 或「设置 → 应用」，会先结束残留进程再删目录，不留残留
 
 注意：.ps1 必须保存成 UTF-8 with BOM，否则 Windows PowerShell 5.1 会按 ANSI 读，中文变乱码并报语法错。
@@ -131,7 +133,7 @@ node tunnel.js --port 3000 --ttl 1h --password 你的密码
       node security-test.mjs                 离线 72 项（自带 echo 上游，不联网、不建隧道）
       node security-test-live.mjs            联网 17 项（真开一条 Cloudflare 隧道，从公网侧验证）
       node build	est-installer.mjs          安装器 18 项（装到临时目录 → 校验 → 运行 → 卸载 → 校验清干净）
-      set TUNNEL_ENTRY=dist\public-tunnel.exe   加这个变量，前两套用例改测打包后的 exe
+      set TUNNEL_ENTRY=dist\oct.exe   加这个变量，前两套用例改测打包后的 exe
 
 覆盖：未认证边界（401/302/403、不碰上游、不读请求体）、Cookie 签名/过期/吊销、Basic、跨站 Origin、
 TRACE/CONNECT/绝对形式请求行、Host 改写与透传、XFF 与 x-real-ip 改写、路径与请求行 CRLF 注入、
@@ -187,7 +189,7 @@ Internet -> Cloudflare 边缘 -> cloudflared -> 密码门 -> 你的应用 里，
 
 桌面/开始菜单快捷方式指向 `one-click-tunnel.exe` —— 一个约 7KB 的原生小程序，源码在 build/launcher/Launcher.cs，
 用 Windows 自带的 csc.exe 编译（`node build/make-launcher.mjs`）。它是 **GUI 子系统**程序（PE Subsystem=2），
-隐藏启动 `public-tunnel.exe app` 后立刻退出，**不会闪出命令行窗口**。
+隐藏启动 `oct.exe app` 后立刻退出，**不会闪出命令行窗口**。
 这同时去掉了对 VBScript 的依赖（微软正在弃用它，Win11 24H2 起是可选功能）。
 
 ## 把局域网设备映射出去（不只是本机端口）
@@ -195,8 +197,8 @@ Internet -> Cloudflare 边缘 -> cloudflared -> 密码门 -> 你的应用 里，
 默认目标是 `127.0.0.1:<port>`。要把局域网里的另一台设备（NAS、摄像头、打印机面板、别的机器上的服务）发出去，
 直接指定目标地址：
 
-    public-tunnel.exe --target 192.168.1.50:8080 --ttl 1h
-    public-tunnel.exe add --name nas --port 5000 --target 192.168.1.50:5000
+    oct.exe --target 192.168.1.50:8080 --ttl 1h
+    oct.exe add --name nas --port 5000 --target 192.168.1.50:5000
 
 - **默认允许**：回环、10/8、172.16/12、192.168/16、fc00::/7，以及解析到这些地址的主机名
 - **默认拒绝**：公网地址、0.0.0.0/::、组播、链路本地（169.254.x.x，含云元数据 169.254.169.254），

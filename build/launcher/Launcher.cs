@@ -5,7 +5,7 @@ using System.Text;
 using System.Windows.Forms;
 
 // one-click-tunnel 无控制台启动器（GUI 子系统小程序）
-//   one-click-tunnel.exe              隐藏启动 public-tunnel.exe app（桌面窗口 + 托盘）
+//   one-click-tunnel.exe              隐藏启动 oct.exe app（桌面窗口 + 托盘）
 //   one-click-tunnel.exe --stop-all   隐藏执行 stop --all 与 daemon stop，然后弹提示
 //   one-click-tunnel.exe --selfcheck <文件> [--spawn-args "<参数>"]   自检（自动化测试用）
 static class Launcher
@@ -14,7 +14,9 @@ static class Launcher
     static int Main(string[] args)
     {
         string dir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-        string exe = Path.Combine(dir, "public-tunnel.exe");
+        string exe = Path.Combine(dir, "oct.exe");
+        // 从 1.5.x 升上来的安装目录里还是旧名字，兜底找一下，避免刚更新完快捷方式打不开
+        if (!File.Exists(exe)) { string legacy = Path.Combine(dir, "public-tunnel.exe"); if (File.Exists(legacy)) exe = legacy; }
         bool stopAll = false;
         string selfcheck = null;
         string spawnArgs = "app";
@@ -32,7 +34,7 @@ static class Launcher
         if (!File.Exists(exe))
         {
             if (selfcheck != null) { File.WriteAllText(selfcheck, log.ToString(), Encoding.UTF8); return 2; }
-            MessageBox.Show("找不到 public-tunnel.exe：" + Environment.NewLine + exe,
+            MessageBox.Show("找不到 oct.exe：" + Environment.NewLine + exe,
                 "one-click-tunnel", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 2;
         }

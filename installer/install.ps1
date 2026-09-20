@@ -1,5 +1,5 @@
 ﻿<#
-  临时公网映射（public-tunnel）一键安装脚本（免管理员：只写当前用户目录 + HKCU）
+  一键隧道（public-tunnel）一键安装脚本（免管理员：只写当前用户目录 + HKCU）
   用法：install.cmd            → 默认装到 %LOCALAPPDATA%\public-tunnel
         install.cmd -InstallDir D:\tools\public-tunnel -NoShortcut
 #>
@@ -12,20 +12,20 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot
-$exeName = 'public-tunnel.exe'
+$exeName = 'oct.exe'
 $srcExe = Join-Path $src $exeName
 
 function Say($msg) { if (-not $Quiet) { Write-Host $msg } }
 
 Say ''
 Say '=========================================='
-Say '  临时公网映射 安装程序（免管理员）'
+Say '  一键隧道 安装程序（免管理员）'
 Say '=========================================='
 Say ''
 
 if (-not (Test-Path $srcExe)) {
   Write-Host ('找不到 ' + $srcExe) -ForegroundColor Red
-  Write-Host '请确认安装包解压完整（public-tunnel.exe 与 install.cmd 在同一目录）' -ForegroundColor Red
+  Write-Host '请确认安装包解压完整（oct.exe 与 install.cmd 在同一目录）' -ForegroundColor Red
   exit 1
 }
 
@@ -53,11 +53,11 @@ if (-not $NoShortcut) {
   $targets = @()
   if (-not $ws) { $targets = @() }
   if ([string]::IsNullOrEmpty($ShortcutDir)) {
-    $targets += (Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs') '临时公网映射.lnk')
-    $targets += (Join-Path ([Environment]::GetFolderPath('Desktop')) '临时公网映射.lnk')
+    $targets += (Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs') '一键隧道.lnk')
+    $targets += (Join-Path ([Environment]::GetFolderPath('Desktop')) '一键隧道.lnk')
   } else {
     New-Item -ItemType Directory -Force -Path $ShortcutDir | Out-Null
-    $targets += (Join-Path $ShortcutDir '临时公网映射.lnk')
+    $targets += (Join-Path $ShortcutDir '一键隧道.lnk')
   }
   foreach ($t in $targets) {
     try {
@@ -79,7 +79,7 @@ $regKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PublicTunne
 New-Item -Path $regKey -Force | Out-Null
 $sz = 0
 foreach ($f in @($exeName, 'cloudflared.exe')) { $p = Join-Path $InstallDir $f; if (Test-Path $p) { $sz += [int]((Get-Item $p).Length / 1KB) } }
-Set-ItemProperty -Path $regKey -Name 'DisplayName' -Value '临时公网映射 (public-tunnel)'
+Set-ItemProperty -Path $regKey -Name 'DisplayName' -Value '一键隧道 (public-tunnel)'
 Set-ItemProperty -Path $regKey -Name 'DisplayVersion' -Value '1.0.0'
 Set-ItemProperty -Path $regKey -Name 'Publisher' -Value 'fafa-local'
 Set-ItemProperty -Path $regKey -Name 'InstallLocation' -Value $InstallDir
@@ -92,7 +92,7 @@ Say '  已注册到「设置 → 应用」卸载列表'
 
 Say ''
 Say '安装完成。'
-Say ('  启动: 双击桌面「临时公网映射」，或运行 ' + (Join-Path $InstallDir 'start.cmd'))
+Say ('  启动: 双击桌面「一键隧道」，或运行 ' + (Join-Path $InstallDir 'start.cmd'))
 Say '  默认: 把 127.0.0.1:3000 映射出去，1 小时后自动关闭，密码随机生成并显示在窗口里'
 Say ('  卸载: ' + $uninstallPath + '   或「设置 → 应用」里卸载')
 Say ''

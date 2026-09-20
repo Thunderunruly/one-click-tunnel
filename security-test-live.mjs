@@ -11,7 +11,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-// 默认测源码 tunnel.js；设 TUNNEL_ENTRY=dist\\public-tunnel.exe 可直接测打包后的 exe
+// 默认测源码 tunnel.js；设 TUNNEL_ENTRY=dist\\oct.exe 可直接测打包后的 exe
 const TUNNEL = process.env.TUNNEL_ENTRY ? path.resolve(HERE, process.env.TUNNEL_ENTRY) : path.join(HERE, 'tunnel.js');
 const NODE = process.execPath;
 const PACKAGED = TUNNEL.toLowerCase().endsWith('.exe');
