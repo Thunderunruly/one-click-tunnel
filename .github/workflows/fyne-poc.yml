@@ -88,3 +88,24 @@ jobs:
           name: oct-poc-linux
           path: poc/fyne/oct-poc-linux
           if-no-files-found: error
+
+  publish:
+    name: publish PoC builds to a release
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-poc
+          merge-multiple: true
+      - name: Show what we got
+        run: ls -lR dist-poc
+      - name: Publish to the poc-fyne pre-release
+        env:
+          GH_TOKEN: ${ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view poc-fyne >/dev/null 2>&1 \
+            && gh release upload poc-fyne dist-poc/* --clobber \
+            || gh release create poc-fyne dist-poc/* --prerelease --title "Fyne PoC (Windows / macOS / Linux)" --notes "实验性 PoC 构建：只用于验证 Fyne 桌面壳（窗口/托盘/中文输入法），不是产品版本。三类产物：oct-poc-windows.exe（双击，GUI 子系统无控制台）、oct-poc-macos（先 chmod +x，未签名需右键打开或 xattr 去隔离；注意是 arm64）、oct-poc-linux（先 chmod +x，需要 libgl1 + 一组 libX* 运行库）。"
