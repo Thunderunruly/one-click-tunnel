@@ -2,6 +2,17 @@
 
 ---
 
+# 1.5.0：四件高级功能
+
+1. 配置页实时输出：Cloudflare 登录 / 建隧道绑域名 改成后台任务，页面显示 cloudflared 的实时输出（不再干等）
+2. 一个隧道绑多个域名：配置文件 hostnames 数组，ingress 每个域名一条，route dns 逐个创建（CLI/GUI/MCP 都支持）
+3. 开机自启 + 常驻：tunnel autostart install（免管理员，写"启动"文件夹）；命名隧道 + autoStart + keepAlive
+   会在意外退出后自动拉起（10 分钟内最多 6 次），做到域名随时可访问
+4. 隧道删除按钮 + 证书提醒：配置页可删 Cloudflare 隧道并改回快速隧道（tunnel undomain --force）；
+   解析 cert.pem 的到期时间，CLI/配置页显示剩余天数，少于 30 天会提醒重新登录
+
+---
+
 # 1.4.0：自有域名（命名隧道，地址永久固定）
 
 - 新增 **命名隧道**：`tunnel login` 浏览器授权一次，`tunnel domain <id> app.example.com` 自动建隧道 +

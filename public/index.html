@@ -91,7 +91,13 @@
       </div>
       <div class="field"><label>Cloudflare 登录（自有域名必选）</label>
         <div class="row tight"><span class="muted" id="cfStatus">读取中...</span><button data-act="cfLogin">登录 Cloudflare</button></div>
-        <span class="muted">用自己的域名（如 app.example.com）需要：域名托管在 Cloudflare + 浏览器授权一次</span>
+        <span class="muted">用自己的域名（如 app.example.com）需要：域名托管在 Cloudflare + 浏览器授权一次。<br>多个域名用逗号/空格分隔；一个隧道可以绑多个域名</span>
+      </div>
+      <div class="field"><label>开机自启 / 常驻</label>
+        <label class="row tight"><input type="checkbox" id="setAutostart"> 开机自动启动（autoStart 的命名隧道随之常驻，域名随时可访问）</label>
+      </div>
+      <div class="field" id="cfLogBox" style="display:none"><label>Cloudflare 操作输出</label>
+        <pre class="log" id="cfLog"></pre>
       </div>
       <div class="field"><label>托盘</label>
         <label class="row tight"><input type="checkbox" id="setTray"> 启动时最小化到托盘</label>
@@ -147,6 +153,30 @@
 
   var TTL_CHOICES = [['15m', '15 分钟'], ['30m', '30 分钟'], ['1h', '1 小时'], ['2h', '2 小时'], ['6h', '6 小时'], ['12h', '12 小时'], ['1d', '1 天']];
   var state = null;
+  function showCfLog(text, show) {
+    var box = document.getElementById('cfLogBox');
+    var pre = document.getElementById('cfLog');
+    if (!box || !pre) return;
+    box.style.display = show ? '' : 'none';
+    if (text !== null && text !== undefined) { pre.textContent = text; pre.scrollTop = pre.scrollHeight; }
+  }
+  function watchTask(taskId) {
+    if (!taskId) return Promise.resolve();
+    showCfLog('等待 cloudflared 输出...', true);
+    return new Promise(function (resolve) {
+      function step() {
+        api('/api/cloudflare?task=' + encodeURIComponent(taskId)).then(function (r) {
+          var t = r.task || {};
+          showCfLog(t.log || '(还没有输出)', true);
+          if (t.running) { setTimeout(step, 900); return; }
+          if (t.ok) { toast('完成'); }
+          else { toast('失败: ' + (t.error || '看下面的输出'), true); }
+          refresh().then(resolve);
+        }).catch(function (e) { showCfLog('读取任务失败: ' + e.message, true); resolve(); });
+      }
+      step();
+    });
+  }
   var openLogs = {};
 
   function esc(s) {
@@ -231,8 +261,9 @@
     h += '<input data-edit="password" data-id="' + esc(s.id) + '" class="mono" placeholder="手动密码" value="' + esc(s.passwordMode === 'fixed' ? s.password : '') + '">';
     h += '<button class="primary" data-act="save" data-id="' + esc(s.id) + '">保存</button>';
     h += '<select data-edit="mode" data-id="' + esc(s.id) + '"><option value="quick"' + (s.mode !== 'named' ? ' selected' : '') + '>快速隧道</option><option value="named"' + (s.mode === 'named' ? ' selected' : '') + '>命名隧道(自有域名)</option></select>';
-    h += '<input data-edit="hostname" data-id="' + esc(s.id) + '" class="mono" placeholder="app.example.com" value="' + esc(s.hostname || '') + '">';
+    h += '<input data-edit="hostname" data-id="' + esc(s.id) + '" class="mono" placeholder="app.example.com,b.example.com" value="' + esc((s.hostnames && s.hostnames.length ? s.hostnames : [s.hostname || '']).filter(Boolean).join(',')) + '">';
     h += '<button data-act="setupDomain" data-id="' + esc(s.id) + '">建隧道并绑定域名</button>';
+    if (s.tunnelId) h += '<button class="danger" data-act="delTunnel" data-id="' + esc(s.id) + '">删除隧道</button>';
     h += '<button data-act="regen" data-id="' + esc(s.id) + '">换随机密码</button>';
     h += '<button class="ghost" data-act="log" data-id="' + esc(s.id) + '">日志</button>';
     h += '</div>';
@@ -284,7 +315,11 @@
     var cfinfo = state.cloudflare || {};
     document.getElementById('cfStatus').textContent = (cfinfo.loggedIn ? '已登录' : '未登录')
       + ' · cloudflared ' + (cfinfo.cloudflared ? '就绪' : '未就绪')
-      + (cfinfo.namedCount ? (' · 命名隧道 ' + cfinfo.namedCount + ' 条') : '');
+      + (cfinfo.namedCount ? (' · 命名隧道 ' + cfinfo.namedCount + ' 条') : '')
+      + (cfinfo.certValidTo ? (' · 证书至 ' + cfinfo.certValidTo.slice(0, 10) + '（' + cfinfo.certDaysLeft + ' 天）') : '')
+      + (cfinfo.certExpiringSoon ? ' ⚠ 证书快到期，建议重新登录' : '');
+    var auto = document.getElementById('setAutostart');
+    if (auto) auto.checked = !!cfinfo.autostart;
     var bar = document.getElementById('updateBar');
     if (up.hasUpdate) {
       bar.style.display = '';
@@ -353,15 +388,18 @@
     if (act === 'regen') return done(api('/api/action', { action: 'regenPassword', id: id }));
     if (act === 'setupDomain') {
       var hostInput = document.querySelector('[data-edit="hostname"][data-id="' + id + '"]');
-      var host = hostInput ? hostInput.value.trim() : '';
-      if (!host) { toast('请先填自有域名，例如 app.example.com', true); return; }
-      el.disabled = true;
-      return api('/api/cloudflare', { action: 'setup', id: id, hostname: host }).then(function (r) {
-        toast('已绑定: ' + (r.publicUrl || host));
-        return refresh();
-      }).catch(function (e) {
-        toast(e.message + (/登录/.test(e.message) ? '（先点上面的「登录 Cloudflare」）' : ''), true);
-      }).then(function () { el.disabled = false; });
+      var hosts = (hostInput ? hostInput.value : '').split(/[\s,;]+/).filter(Boolean);
+      if (!hosts.length) { toast('请先填自有域名，例如 app.example.com', true); return; }
+      return api('/api/cloudflare', { action: 'setupTask', id: id, hostnames: hosts }).then(function (r) {
+        toast('开始建隧道并绑定 ' + hosts.join(', '));
+        return watchTask(r.task);
+      });
+    }
+    if (act === 'delTunnel') {
+      if (!confirm('删除 Cloudflare 上的命名隧道（' + id + '）并改回快速隧道？DNS 记录需要你在 Cloudflare 后台删。')) return;
+      return api('/api/cloudflare', { action: 'deleteTunnel', id: id }).then(function () {
+        toast('已删除隧道'); return refresh();
+      }).catch(function (e) { toast(e.message, true); });
     }
     if (act === 'start' || act === 'stop') {
       el.disabled = true;
@@ -369,6 +407,14 @@
     }
   });
 
+  document.addEventListener('change', function (ev) {
+    if (ev.target && ev.target.id === 'setAutostart') {
+      var on = ev.target.checked;
+      api('/api/cloudflare', { action: 'autostart', enabled: on }).then(function () {
+        toast(on ? '已开启开机自启' : '已取消开机自启'); return refresh();
+      }).catch(function (e) { toast(e.message, true); ev.target.checked = !on; });
+    }
+  });
   document.addEventListener('click', function (ev) {
     var uel = ev.target.closest('[data-act="updateCheck"],[data-act="updateDownload"],[data-act="updateInstall"],[data-act="updateRelease"],[data-act="updateIgnore"],[data-act="updateNotes"]');
     if (uel) {
@@ -396,12 +442,9 @@
     var act = el.getAttribute('data-act');
     var p;
     if (act === 'cfLogin') {
-      el.disabled = true;
       toast('浏览器里完成授权（选择你的域名）…最长等 5 分钟');
-      p = api('/api/cloudflare', { action: 'login' });
-      p.then(function (r) { return refresh().then(function () { toast('已登录 Cloudflare'); }); })
-        .catch(function (e) { toast(e.message, true); })
-        .then(function () { el.disabled = false; });
+      api('/api/cloudflare', { action: 'login' }).then(function (r) { return watchTask(r.task); })
+        .catch(function (e) { toast(e.message, true); });
       return;
     }
     if (act === 'startAll') p = api('/api/action', { action: 'startAll' });

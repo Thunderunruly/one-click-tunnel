@@ -53,7 +53,7 @@ function parseArgs(argv) {
   const out = { port: 3000, ttl: '1h', password: '', gateway: 18080, host: '127.0.0.1',
     upstreamHost: '', cloudflared: '', noDownload: false, noTunnel: false, open: false, forcePublicGateway: false, rateLimit: 3000, allowHosts: [],
     runProfile: '', config: '', stateFile: '', name: '',
-    tunnelMode: '', hostname: '', tunnelName: '', dryRun: false };
+    tunnelMode: '', hostname: '', hostnames: [], tunnelName: '', dryRun: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -232,6 +232,7 @@ function applyProfile(args) {
   args.tunnelMode = String(p.mode || 'quick');
   args.hostname = String(p.hostname || '');
   args.tunnelName = String(p.tunnelName || p.id || '');
+  args.hostnames = Array.isArray(p.hostnames) ? p.hostnames.slice() : (p.hostname ? [p.hostname] : []);
   args.name = p.name;
   return p;
 }
@@ -567,14 +568,17 @@ async function main() {
   let namedCtx = null;
   if (!args.noTunnel && isNamedMode) {
     const stateDir = args.stateFile ? path.dirname(args.stateFile) : path.join(HERE, 'state');
-    const profile = { id: args.runProfile || 'manual', mode: 'named', hostname: args.hostname, tunnelName: args.tunnelName || args.runProfile || 'manual' };
+    const profile = { id: args.runProfile || 'manual', mode: 'named', hostname: args.hostname,
+      hostnames: (args.hostnames && args.hostnames.length ? args.hostnames : (args.hostname ? [args.hostname] : [])),
+      tunnelName: args.tunnelName || args.runProfile || 'manual' };
     const rd = NAMED.namedReadiness(HERE, stateDir, profile, args.cloudflared);
     if (!rd.ready) throw new Error('命名隧道还没准备好 —— ' + rd.steps.join('；'));
-    const yaml = NAMED.buildConfigYaml({ hostname: rd.hostname, gatewayPort: args.gateway, tunnelId: rd.tunnelId, credentialsFile: rd.credentialsFile });
+    const yaml = NAMED.buildConfigYaml({ hostnames: rd.hostnames, gatewayPort: args.gateway, tunnelId: rd.tunnelId, credentialsFile: rd.credentialsFile });
     fs.mkdirSync(path.dirname(rd.configFile), { recursive: true });
     fs.writeFileSync(rd.configFile, yaml, 'utf8');
     namedCtx = {
-      url: rd.publicUrl, configFile: rd.configFile, tunnelId: rd.tunnelId, hostname: rd.hostname,
+      url: rd.publicUrl, urls: rd.publicUrls, configFile: rd.configFile, tunnelId: rd.tunnelId,
+      hostname: rd.hostname, hostnames: rd.hostnames,
       args: NAMED.runArgs({ configFile: rd.configFile, tunnelId: rd.tunnelId }),
     };
     log('命名隧道已就绪: ' + namedCtx.url + '  ->  http://127.0.0.1:' + args.gateway);
@@ -654,6 +658,7 @@ async function main() {
   writeState({ running: true, phase: 'running', url: url, cloudflaredPid: (child && child.pid) ? child.pid : 0,
     expiresAt: expiresAt, startedAt: Date.now(), password: password, port: args.port, gateway: args.gateway,
     mode: isNamedMode ? 'named' : 'quick', hostname: args.hostname || '',
+    hostnames: namedCtx ? namedCtx.hostnames : (args.hostnames || []),
     tunnelId: namedCtx ? namedCtx.tunnelId : '', configFile: namedCtx ? namedCtx.configFile : '' });
 
   let closed = false;
@@ -703,7 +708,7 @@ async function main() {
 // 子命令走 lib/cli.js（GUI / 托盘 / MCP / 多通道管理）；以 - 开头的老参数仍然是"前台单通道"模式
 const SUBCOMMANDS = ['gui', 'tray', 'mcp', 'list', 'status', 'start', 'stop', 'enable', 'disable',
   'autostart-on', 'autostart-off', 'regen', 'add', 'rm', 'remove', 'delete', 'config', 'api', 'daemon', 'help',
-  'update', 'version', 'app', 'login', 'domain', 'info'];
+  'update', 'version', 'app', 'login', 'domain', 'undomain', 'info', 'autostart'];
 const ARGV = process.argv.slice(2);
 if (ARGV.length && !ARGV[0].startsWith('-') && SUBCOMMANDS.includes(ARGV[0])) {
   require('./lib/cli.js').run(ARGV[0], ARGV.slice(1))

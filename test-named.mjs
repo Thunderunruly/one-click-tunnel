@@ -111,6 +111,21 @@ ok('N29 没有 cloudflared 时登录给出可读错误', lr.ok === false && /clo
 const sd = S.setupDomain({ appDir: tmp, stateDir: stateDir, profile: { id: 'web' }, hostname: 'bad host', cloudflared: HAS_CF ? realCloudflared : undefined });
 ok('N30 非法域名在 setup 阶段就被拦下', sd.ok === false && /域名/.test(sd.error || ''), sd.error);
 
+console.log('== 多域名 + 开机自启 ==');
+ok('N31 多个域名去重并全部进 ingress', (() => {
+  const y = N.buildConfigYaml({ hostnames: ['a.example.com', 'B.example.com', 'a.example.com'], gatewayPort: 18080, tunnelId: 'x', credentialsFile: 'c.json' });
+  return (y.match(/hostname: /g) || []).length === 2 && y.includes('hostname: a.example.com') && y.includes('hostname: b.example.com') && y.includes('http_status:404');
+})());
+ok('N32 hostnamesOf 归一化（hostname 作为补充）', JSON.stringify(N.hostnamesOf({ hostnames: ['a.example.com'], hostname: 'b.example.com' })) === JSON.stringify(['a.example.com', 'b.example.com']));
+const A = require(path.join(HERE, 'lib', 'autostart.js'));
+const startupTmp = path.join(tmp, 'startup');
+ok('N33 开机自启：初始未安装', A.status(HERE, startupTmp).installed === false);
+const inst = A.install(HERE, startupTmp);
+ok('N34 安装开机自启会写快捷方式', inst.ok && fs.existsSync(A.linkPath(startupTmp)) === true, JSON.stringify(inst).slice(0, 120));
+ok('N35 已安装状态可读', A.status(HERE, startupTmp).installed === true);
+const unin = A.uninstall(startupTmp);
+ok('N36 取消开机自启会删掉快捷方式', unin.ok && !fs.existsSync(A.linkPath(startupTmp)));
+
 console.log('\n================ 命名隧道测试结果 ================');
 console.log('通过 ' + passCount + ' 项，失败 ' + failures.length + ' 项');
 for (const f of failures) console.log('  FAILED: ' + f);
