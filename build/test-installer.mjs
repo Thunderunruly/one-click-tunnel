@@ -70,9 +70,7 @@ async function main() {
     if (fs.existsSync(lnk)) {
       const target = ps('(New-Object -ComObject WScript.Shell).CreateShortcut("' + lnk + '").TargetPath');
       const argsOf = ps('(New-Object -ComObject WScript.Shell).CreateShortcut("' + lnk + '").Arguments');
-      const isWscript = /wscript\.exe$/i.test(target);
-      const pointsToLauncher = /launch\.vbs/i.test(argsOf) || /start\.cmd$/i.test(target);
-      ok('I3b 快捷方式走无控制台启动器（wscript + launch.vbs）', isWscript && pointsToLauncher, target + ' ' + argsOf);
+      ok('I3b 快捷方式指向无控制台启动器 one-click-tunnel.exe', /one-click-tunnel\.exe$/i.test(target), target + ' ' + argsOf);
     }
   }
   const rq = regQuery();

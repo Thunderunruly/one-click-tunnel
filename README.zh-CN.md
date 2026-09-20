@@ -183,3 +183,10 @@ Internet -> Cloudflare 边缘 -> cloudflared -> 密码门 -> 你的应用 里，
 所以决定保留 Node 实现。随时可以 `node build/bench.mjs`（或 `npm run bench`）复测；将来真遇到这个量级的负载，
 再拿数据重新评估。
 
+## 无控制台启动器（不依赖 VBScript）
+
+桌面/开始菜单快捷方式指向 `one-click-tunnel.exe` —— 一个约 7KB 的原生小程序，源码在 build/launcher/Launcher.cs，
+用 Windows 自带的 csc.exe 编译（`node build/make-launcher.mjs`）。它是 **GUI 子系统**程序（PE Subsystem=2），
+隐藏启动 `public-tunnel.exe app` 后立刻退出，**不会闪出命令行窗口**。
+这同时去掉了对 VBScript 的依赖（微软正在弃用它，Win11 24H2 起是可选功能）。
+

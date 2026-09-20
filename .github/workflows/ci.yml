@@ -32,7 +32,7 @@ jobs:
             node --check $_.FullName
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
-          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-update.mjs','test-named.mjs','test-exe.mjs','test-tray.mjs','build/test-installer.mjs')) {
+          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-update.mjs','test-named.mjs','test-exe.mjs','test-launcher.mjs','test-tray.mjs','build/test-installer.mjs')) {
             node --check $f
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
@@ -63,6 +63,9 @@ jobs:
 
       - name: Build single-file exe (needed by the installer test)
         run: node build/make-exe.mjs
+
+      - name: Native launcher tests (8, GUI subsystem / no console)
+        run: node test-launcher.mjs
 
       - name: Bundled installer test (18)
         run: node build/test-installer.mjs

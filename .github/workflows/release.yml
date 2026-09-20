@@ -62,6 +62,9 @@ jobs:
       - name: Test packaged exe (CLI / GUI / self-spawn)
         run: node test-exe.mjs
 
+      - name: Native launcher tests (8)
+        run: node test-launcher.mjs
+
       - name: Build portable zip (double-click install.cmd)
         run: node build/make-zip.mjs
 

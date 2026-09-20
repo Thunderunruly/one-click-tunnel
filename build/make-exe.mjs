@@ -86,10 +86,21 @@ run(npxCmd, ['--yes', 'postject', OUT, 'NODE_SEA_BLOB', blob, '--sentinel-fuse',
 const cfSrc = path.join(ROOT, 'cloudflared.exe');
 if (fs.existsSync(cfSrc)) { fs.copyFileSync(cfSrc, path.join(DIST, 'cloudflared.exe')); console.log('已复制 cloudflared.exe'); }
 else console.log('注意: 没找到 cloudflared.exe，exe 首次运行会自动下载');
-for (const f of ['install.cmd', 'install.ps1', 'uninstall.cmd', 'uninstall.ps1', 'start.cmd', 'tray.cmd', 'stop-all.cmd', 'stop-all.vbs', 'launch.vbs', 'stop.cmd', 'README.md']) {
+for (const f of ['install.cmd', 'install.ps1', 'uninstall.cmd', 'uninstall.ps1', 'start.cmd', 'tray.cmd', 'stop-all.cmd', 'stop.cmd', 'README.md']) {
   const s = path.join(ROOT, 'installer', f);
   if (fs.existsSync(s)) fs.copyFileSync(s, path.join(DIST, f));
 }
+run(process.execPath, [path.join(ROOT, 'build', 'make-launcher.mjs')]);
+
+// RUNTIME_JUNK：清掉 dist 里的运行期文件（配置/日志/状态/pid），它们不该进发布包
+for (const junk of ['config.json', 'logs', 'state', 'updates']) {
+  try { fs.rmSync(path.join(DIST, junk), { recursive: true, force: true }); } catch (e) {}
+}
+for (const f of fs.readdirSync(DIST)) { if (f.endsWith('.pid')) { try { fs.rmSync(path.join(DIST, f), { force: true }); } catch (e) {} } }
+
+// 清掉历史遗留的 dist/*.vbs（1.5.1 之前用 VBScript 启动器）
+for (const f of fs.readdirSync(DIST)) { if (f.endsWith('.vbs')) { fs.rmSync(path.join(DIST, f), { force: true }); console.log('已清理遗留文件: dist/' + f); } }
+
 const size = (p) => (fs.existsSync(p) ? (fs.statSync(p).size / 1024 / 1024).toFixed(1) + ' MB' : '-');
 console.log('\n产物:');
 for (const f of fs.readdirSync(DIST)) console.log('  dist/' + f + '   ' + size(path.join(DIST, f)));

@@ -2,6 +2,17 @@
 
 ---
 
+# 1.5.2：原生无控制台启动器（不再依赖 VBScript）
+
+- 新增 build/launcher/Launcher.cs + build/make-launcher.mjs：用系统自带 csc.exe 编译出
+  dist/one-click-tunnel.exe（GUI 子系统，约 7KB）。启动时隐藏调起 public-tunnel.exe app，
+  完全不会弹命令行窗口，也不依赖 VBScript（微软正在弃用 VBScript，Win11 24H2 起是可选功能）
+- 快捷方式改为指向它：桌面/开始菜单 = one-click-tunnel.exe；另有「全部关闭」= one-click-tunnel.exe --stop-all
+- 安装脚本 / Inno Setup / 开机自启 全部改用原生启动器；launch.vbs、stop-all.vbs 已删除
+- 测试：node test-launcher.mjs 8 项（PE Subsystem=GUI、能找到并驱动主程序、缺文件时有可读提示）
+
+---
+
 # 1.5.1：修掉开机自启启动器（launch.vbs）解析失败
 
 - 现象：双击桌面/开始菜单快捷方式弹出 "Windows Script Host ... 无效字符 800A0408"

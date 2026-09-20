@@ -34,16 +34,16 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 Source: "..\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\cloudflared.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\*.cmd"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\dist\*.vbs"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\one-click-tunnel.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{userprograms}\one-click-tunnel"; Filename: "{sys}\wscript.exe"; Parameters: "//nologo ""{app}\launch.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Comment: "临时公网映射（桌面窗口 + 托盘）"
-Name: "{userprograms}\one-click-tunnel 全部关闭"; Filename: "{sys}\wscript.exe"; Parameters: "//nologo ""{app}\stop-all.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Comment: "关闭所有通道与后台进程"
-Name: "{userdesktop}\one-click-tunnel"; Filename: "{sys}\wscript.exe"; Parameters: "//nologo ""{app}\launch.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{userprograms}\one-click-tunnel"; Filename: "{app}\one-click-tunnel.exe"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Comment: "临时公网映射（桌面窗口 + 托盘，无命令行弹窗）"
+Name: "{userprograms}\one-click-tunnel 全部关闭"; Filename: "{app}\one-click-tunnel.exe"; Parameters: "--stop-all"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Comment: "关闭所有通道与后台进程"
+Name: "{userdesktop}\one-click-tunnel"; Filename: "{app}\one-click-tunnel.exe"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{sys}\wscript.exe"; Parameters: "//nologo ""{app}\launch.vbs"""; Description: "立即启动（桌面窗口 + 托盘）"; Flags: postinstall skipifsilent
+Filename: "{app}\one-click-tunnel.exe"; Description: "立即启动（桌面窗口 + 托盘）"; Flags: postinstall skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\logs"

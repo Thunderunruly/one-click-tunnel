@@ -212,3 +212,11 @@ A Go rewrite would mostly buy a smaller binary (~10 MB) and less memory per tunn
 so the Node implementation stays. Re-measure any time with `node build/bench.mjs` (or `npm run bench`); if a real
 workload ever reaches these numbers, revisit the decision with data.
 
+## Launcher: no console window, no VBScript
+
+The desktop/Start-Menu shortcut points at `one-click-tunnel.exe` - a ~7 KB native launcher compiled from
+build/launcher/Launcher.cs with the csc.exe that ships with Windows. It is a **GUI-subsystem** binary
+(PE Subsystem=2), so it starts `public-tunnel.exe app` hidden and exits immediately: **no console window flashes**.
+It also removed the old VBScript launcher, which matters because Microsoft is deprecating VBScript
+(optional feature since Windows 11 24H2). Rebuild it with `node build/make-launcher.mjs`.
+
