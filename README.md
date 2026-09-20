@@ -70,9 +70,9 @@ daemon starts a tiny Windows process (PowerShell WinForms, no extra dependency) 
 
 The shortcut starts the background daemon **hidden** and opens the config page inside a chromeless desktop
 window (Edge/Chrome app mode: no address bar, no tabs, its own taskbar entry and icon). Closing that window
-does **not** stop the tunnels - the tray icon stays, and the tray menu (or the "全部关闭" shortcut) quits
-everything (the "close everything" shortcut runs stop-all.vbs). No cmd window appears: the shortcut runs a
-.vbs launcher and the daemon is spawned detached and hidden.
+does **not** stop the tunnels - the tray icon stays, and the tray menu (or the "close everything" shortcut,
+which runs stop-all.vbs) quits everything. No cmd window appears: the shortcut runs a .vbs launcher and the
+daemon is spawned detached and hidden.
 
     public-tunnel.exe app             # open the desktop window (starts the daemon when needed)
     public-tunnel.exe gui --browser   # use a normal browser tab instead of the app window
