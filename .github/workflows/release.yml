@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'version to release, e.g. 1.1.0 (empty = package.json version)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: build exe + installers and publish release
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = '${{ github.event.inputs.version }}'
+          if (-not $v -and '${{ github.ref_type }}' -eq 'tag') { $v = '${{ github.ref_name }}'.TrimStart('v') }
+          if (-not $v) { $v = (Get-Content package.json -Raw | ConvertFrom-Json).version }
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $pkg.version = $v
+          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json -Encoding utf8
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "version: $v"
+
+      - name: Download cloudflared (ship it so users need no download)
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe'
+          Invoke-WebRequest -Uri $url -OutFile cloudflared.exe -UseBasicParsing
+          $len = (Get-Item cloudflared.exe).Length
+          if ($len -lt 5MB) { throw "cloudflared download incomplete: $len bytes" }
+          Write-Host ("cloudflared: {0:N1} MB" -f ($len / 1MB))
+
+      - name: Regression tests (source, offline)
+        shell: pwsh
+        run: |
+          foreach ($t in @('security-test.mjs','test-multi.mjs','security-test-gui.mjs','test-mcp.mjs')) {
+            Write-Host "== $t =="
+            node $t
+            if ($LASTEXITCODE -ne 0) { throw "$t failed" }
+          }
+
+      - name: Build single-file exe (Node SEA)
+        run: node build/make-exe.mjs
+
+      - name: Test packaged exe (CLI / GUI / self-spawn)
+        run: node test-exe.mjs
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          $lines = @()
+          foreach ($f in @('dist/public-tunnel.exe','dist/cloudflared.exe')) {
+            $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+            $lines += ($h + '  ' + (Split-Path $f -Leaf))
+          }
+          $lines | Set-Content release/SHA256SUMS.txt -Encoding ascii
+          Get-Content release/SHA256SUMS.txt
+
+      - name: Build portable zip (double-click install.cmd)
+        run: node build/make-zip.mjs
+
+      - name: Build Inno Setup installer (if ISCC is available on the runner)
+        run: node build/make-setup.mjs
+
+      - name: Silent install / uninstall check
+        if: hashFiles('release/*setup*.exe') != ''
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem release/*setup*.exe | Select-Object -First 1).FullName
+          $dir = Join-Path $env:TEMP ('oct-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+          Write-Host "install dir: $dir"
+          $p = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR=' + $dir) -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "install failed with exit code $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $dir 'public-tunnel.exe'))) { throw 'public-tunnel.exe missing after install' }
+          if (-not (Test-Path (Join-Path $dir 'cloudflared.exe'))) { throw 'cloudflared.exe missing after install' }
+          & (Join-Path $dir 'public-tunnel.exe') help | Out-Host
+          if ($LASTEXITCODE -ne 0) { throw 'installed exe cannot run' }
+          $unins = Join-Path $dir 'unins000.exe'
+          if (Test-Path $unins) {
+            $u = Start-Process -FilePath $unins -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -PassThru -Wait
+            if ($u.ExitCode -ne 0) { throw "uninstall failed with exit code $($u.ExitCode)" }
+          }
+          Start-Sleep -Seconds 2
+          if (Test-Path (Join-Path $dir 'public-tunnel.exe')) { throw 'files still present after uninstall' }
+          Write-Host 'install / uninstall check passed'
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ver = '${{ steps.ver.outputs.version }}'
+          $tag = 'v' + $ver
+          $assets = @()
+          $assets += @(Get-ChildItem release/*.zip -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          $assets += @(Get-ChildItem release/*setup*.exe -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          $assets += @(Get-ChildItem release/SHA256SUMS.txt -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          Write-Host "tag: $tag"
+          foreach ($a in $assets) { Write-Host "asset: $a" }
+          $notes = @(
+            '## Windows install (no admin required)',
+            '',
+            '1. Easiest: download **one-click-tunnel-setup-' + $ver + '.exe** and run it.',
+            '2. Portable: download the **zip**, unpack, double-click install.cmd.',
+            '',
+            'After install, launch the shortcut: it opens the local config page (background daemon + tray icon).',
+            'You can run many tunnels at once, each with its own password and expiry time.',
+            'AI integration: point your MCP host at public-tunnel.exe with the argument mcp.',
+            '',
+            'Verify downloads against SHA256SUMS.txt.'
+          ) -join [Environment]::NewLine
+          gh release view $tag --json tagName *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag @assets --clobber
+          } else {
+            gh release create $tag @assets --title ('one-click-tunnel ' + $ver) --notes $notes --target '${{ github.sha }}'
+          }

@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+# Windows 批处理和 PowerShell 脚本用 CRLF，避免 cmd.exe 的 label/goto 解析出错
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+*.exe binary
+*.zip binary
+*.png binary

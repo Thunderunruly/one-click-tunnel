@@ -1,0 +1,23 @@
+# 构建产物（用 node build\make-exe.mjs 重新生成）
+dist/
+release/
+build/bundle.cjs
+build/sea-prep.blob
+
+# 第三方二进制（首次运行会自动下载，构建时由 CI 下载）
+cloudflared.exe
+
+# 运行期状态
+logs/
+state/
+.tunnel-*.pid
+.cloudflared.pid
+config.json
+
+# 依赖 / 编辑器
+node_modules/
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db

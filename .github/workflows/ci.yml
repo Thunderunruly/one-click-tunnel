@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+    paths-ignore: [ '**/*.md' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: syntax + offline tests (windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Syntax check
+        shell: pwsh
+        run: |
+          node --check tunnel.js
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-ChildItem lib/*.js | ForEach-Object {
+            node --check $_.FullName
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-exe.mjs','test-tray.mjs','build/test-installer.mjs')) {
+            node --check $f
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+
+      - name: Classic single-tunnel security tests (72)
+        run: node security-test.mjs
+
+      - name: Multi-tunnel manager tests (25)
+        run: node test-multi.mjs
+
+      - name: GUI / daemon API security tests (29)
+        run: node security-test-gui.mjs
+
+      - name: MCP protocol and tools tests (27)
+        run: node test-mcp.mjs
+
+      - name: Bundled installer test (18)
+        run: node build/test-installer.mjs

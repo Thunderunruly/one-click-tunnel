@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>临时公网映射 · 配置页</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0f1115; color: #e5e7eb; font: 14px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 20px 18px 60px; }
+  h1 { font-size: 19px; margin: 0; }
+  .top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .grow { flex: 1; }
+  .muted { color: #8b95a5; font-size: 12.5px; }
+  .card { background: #171a21; border: 1px solid #262b36; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .card.running { border-color: #1f6f43; box-shadow: 0 0 0 1px #14532d inset; }
+  .card.stopped { opacity: .92; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row.tight { gap: 8px; }
+  button { background: #232936; color: #e5e7eb; border: 1px solid #313a4b; border-radius: 9px; padding: 7px 12px; cursor: pointer; font-size: 13px; }
+  button:hover { background: #2b3342; }
+  button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  button.primary:hover { background: #1d4ed8; }
+  button.danger { background: #3b1d22; border-color: #7f1d1d; color: #fca5a5; }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  input, select { background: #0f1115; color: #e5e7eb; border: 1px solid #303645; border-radius: 9px; padding: 7px 10px; font-size: 13px; }
+  input[type=checkbox] { width: auto; }
+  input.mono, .mono { font-family: ui-monospace, Consolas, monospace; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; border: 1px solid #313a4b; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+  .badge.on { border-color: #1f6f43; color: #86efac; }
+  .badge.on .dot { background: #22c55e; }
+  .badge.off { color: #9ca3af; }
+  .badge.warn { border-color: #7f5f1d; color: #fcd34d; }
+  .badge.warn .dot { background: #f59e0b; }
+  .url { color: #93c5fd; word-break: break-all; }
+  .pw { letter-spacing: .5px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { color: #9aa4b2; font-size: 12px; }
+  pre.log { background: #0b0d11; border: 1px solid #262b36; border-radius: 10px; padding: 10px; max-height: 240px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+  .toast { position: fixed; right: 18px; bottom: 18px; background: #1f2937; border: 1px solid #374151; padding: 10px 14px; border-radius: 10px; max-width: 60vw; }
+  .toast.err { border-color: #7f1d1d; color: #fca5a5; }
+  details summary { cursor: pointer; color: #9aa4b2; }
+  hr { border: 0; border-top: 1px solid #262b36; margin: 14px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>临时公网映射 · 配置页</h1>
+    <span class="muted" id="daemonInfo">连接中...</span>
+    <span class="grow"></span>
+    <button class="primary" data-act="startAll">全部启动</button>
+    <button data-act="stopAll">全部停止</button>
+    <button data-act="refresh">刷新</button>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <strong>全局设置</strong>
+      <span class="muted">这些是新建通道时的默认值</span>
+    </div>
+    <hr>
+    <div class="grid">
+      <div class="field"><label>默认有效期 (TTL)</label><select id="setTtl"></select></div>
+      <div class="field"><label>默认密码模式</label>
+        <select id="setPwMode"><option value="random">每次随机生成</option><option value="fixed">手动固定</option></select>
+      </div>
+      <div class="field"><label>网关起始端口</label><input id="setGwStart" type="number" min="1024" max="65000"></div>
+      <div class="field"><label>每 IP 每分钟请求上限</label><input id="setRateLimit" type="number" min="10"></div>
+      <div class="field"><label>MCP（AI 集成）</label>
+        <label class="row tight"><input type="checkbox" id="setMcp"> 允许 AI 通过 MCP 管理通道</label>
+      </div>
+      <div class="field"><label>托盘</label>
+        <label class="row tight"><input type="checkbox" id="setTray"> 启动时最小化到托盘</label>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" data-act="saveSettings">保存全局设置</button>
+      <span class="muted">配置页地址只在 127.0.0.1 上监听，且需要 token</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row"><strong>新增通道</strong><span class="muted">一个通道 = 一个本机端口 + 一个独立密码 + 一个独立到期时间</span></div>
+    <hr>
+    <div class="grid">
+      <div class="field"><label>名称</label><input id="addName" placeholder="例如 前端 5777"></div>
+      <div class="field"><label>本机端口</label><input id="addPort" type="number" min="1" max="65535" placeholder="5777"></div>
+      <div class="field"><label>网关端口（留空自动分配）</label><input id="addGateway" type="number" min="1024" max="65535" placeholder="自动"></div>
+      <div class="field"><label>有效期</label><select id="addTtl"></select></div>
+      <div class="field"><label>密码</label>
+        <select id="addPwMode"><option value="random">随机生成</option><option value="fixed">手动设置</option></select>
+      </div>
+      <div class="field"><label>手动密码</label><input id="addPassword" placeholder="选‘手动设置’时填写"></div>
+      <div class="field"><label>&nbsp;</label><label class="row tight"><input type="checkbox" id="addAuto"> 随守护进程自动启动</label></div>
+      <div class="field"><label>&nbsp;</label><label class="row tight"><input type="checkbox" id="addNoTunnel"> 只起本地密码门（不建隧道，排障用）</label></div>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="primary" data-act="add">添加通道</button></div>
+  </div>
+
+  <div id="list"></div>
+</div>
+<div id="toast" class="toast" style="display:none"></div>
+
+<script>
+(function () {
+  var TOKEN = new URLSearchParams(location.search).get('token') || '';
+  if (TOKEN) { try { sessionStorage.setItem('pt_token', TOKEN); } catch (e) {} }
+  if (!TOKEN) { try { TOKEN = sessionStorage.getItem('pt_token') || ''; } catch (e) {} }
+
+  var TTL_CHOICES = [['15m', '15 分钟'], ['30m', '30 分钟'], ['1h', '1 小时'], ['2h', '2 小时'], ['6h', '6 小时'], ['12h', '12 小时'], ['1d', '1 天']];
+  var state = null;
+  var openLogs = {};
+
+  function esc(s) {
+    return String(s === undefined || s === null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function toast(msg, isErr) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (isErr ? ' err' : '');
+    t.style.display = 'block';
+    setTimeout(function () { t.style.display = 'none'; }, isErr ? 6000 : 2600);
+  }
+  function api(path, body, method) {
+    var opt = { method: method || (body ? 'POST' : 'GET'), headers: { 'x-tunnel-token': TOKEN } };
+    if (body) { opt.headers['content-type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    return fetch(path, opt).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        return j;
+      });
+    });
+  }
+  function fillTtlSelect(el, value) {
+    var html = '';
+    var found = false;
+    for (var i = 0; i < TTL_CHOICES.length; i++) {
+      var v = TTL_CHOICES[i][0];
+      if (v === value) found = true;
+      html += '<option value="' + v + '"' + (v === value ? ' selected' : '') + '>' + TTL_CHOICES[i][1] + '</option>';
+    }
+    if (!found && value) html += '<option value="' + esc(value) + '" selected>' + esc(value) + '</option>';
+    el.innerHTML = html;
+  }
+  function remainText(s) {
+    if (!s.running || !s.expiresAt) return '-';
+    var ms = Math.max(0, s.expiresAt - Date.now());
+    var sec = Math.floor(ms / 1000);
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), ss = sec % 60;
+    return (h ? h + ' 小时 ' : '') + m + ' 分 ' + ss + ' 秒';
+  }
+  function card(s) {
+    var cls = s.running ? 'running' : 'stopped';
+    var badge = s.running
+      ? '<span class="badge on"><span class="dot"></span>' + (s.phase === 'starting' ? '启动中' : '运行中') + '</span>'
+      : '<span class="badge off"><span class="dot"></span>已停止</span>';
+    if (!s.enabled) badge += ' <span class="badge warn"><span class="dot"></span>已停用</span>';
+    var pw = s.password || '（启动后生成）';
+    var h = '';
+    h += '<div class="card ' + cls + '" data-card="' + esc(s.id) + '">';
+    h += '<div class="row"><strong>' + esc(s.name) + '</strong><span class="muted mono">' + esc(s.id) + '</span>' + badge;
+    h += '<span class="grow"></span>';
+    h += s.running ? '<button data-act="stop" data-id="' + esc(s.id) + '">停止</button>' : '<button class="primary" data-act="start" data-id="' + esc(s.id) + '">启动</button>';
+    h += '<button data-act="enable" data-id="' + esc(s.id) + '" data-on="' + (s.enabled ? '0' : '1') + '">' + (s.enabled ? '停用' : '启用') + '</button>';
+    h += '<button data-act="autostart" data-id="' + esc(s.id) + '" data-on="' + (s.autoStart ? '0' : '1') + '">' + (s.autoStart ? '取消自动启动' : '自动启动') + '</button>';
+    h += '<button class="danger" data-act="del" data-id="' + esc(s.id) + '">删除</button>';
+    h += '</div>';
+    h += '<div class="row" style="margin-top:8px"><span class="muted">本机端口</span><span class="mono">' + s.port + '</span>';
+    h += '<span class="muted">网关</span><span class="mono">127.0.0.1:' + s.gateway + '</span>';
+    h += '<span class="muted">TTL</span><span class="mono">' + esc(s.ttl) + '</span>';
+    h += '<span class="muted">剩余</span><span class="mono" data-remain="' + esc(s.id) + '">' + remainText(s) + '</span></div>';
+    if (s.url) {
+      h += '<div class="row" style="margin-top:6px"><span class="muted">公网地址</span><span class="url mono">' + esc(s.url) + '</span>';
+      h += '<button data-act="copy" data-copy="' + esc(s.url) + '">复制</button></div>';
+    }
+    h += '<div class="row" style="margin-top:6px"><span class="muted">访问密码</span>';
+    h += '<span class="mono pw" data-pw="' + esc(s.id) + '" data-hidden="1">••••••••</span>';
+    h += '<button data-act="togglePw" data-id="' + esc(s.id) + '">显示</button>';
+    h += '<button data-act="copy" data-copy="' + esc(s.password || '') + '">复制</button>';
+    h += '<span class="muted">模式</span><span class="mono">' + (s.passwordMode === 'fixed' ? '手动固定' : '每次随机') + '</span></div>';
+    if (s.error) h += '<div class="row" style="margin-top:6px"><span class="badge warn"><span class="dot"></span>' + esc(s.error) + '</span></div>';
+    h += '<hr>';
+    h += '<div class="row tight">';
+    h += '<select data-edit="ttl" data-id="' + esc(s.id) + '">' + ttlOptions(s.ttl) + '</select>';
+    h += '<select data-edit="pwmode" data-id="' + esc(s.id) + '"><option value="random"' + (s.passwordMode !== 'fixed' ? ' selected' : '') + '>每次随机</option><option value="fixed"' + (s.passwordMode === 'fixed' ? ' selected' : '') + '>手动固定</option></select>';
+    h += '<input data-edit="password" data-id="' + esc(s.id) + '" class="mono" placeholder="手动密码" value="' + esc(s.passwordMode === 'fixed' ? s.password : '') + '">';
+    h += '<button class="primary" data-act="save" data-id="' + esc(s.id) + '">保存</button>';
+    h += '<button data-act="regen" data-id="' + esc(s.id) + '">换随机密码</button>';
+    h += '<button class="ghost" data-act="log" data-id="' + esc(s.id) + '">日志</button>';
+    h += '</div>';
+    if (openLogs[s.id]) h += '<pre class="log" data-log="' + esc(s.id) + '">' + esc(openLogs[s.id]) + '</pre>';
+    h += '</div>';
+    return h;
+  }
+  function ttlOptions(cur) {
+    var html = '';
+    var found = false;
+    for (var i = 0; i < TTL_CHOICES.length; i++) {
+      if (TTL_CHOICES[i][0] === cur) found = true;
+      html += '<option value="' + TTL_CHOICES[i][0] + '"' + (TTL_CHOICES[i][0] === cur ? ' selected' : '') + '>' + TTL_CHOICES[i][1] + '</option>';
+    }
+    if (!found) html = '<option value="' + esc(cur) + '" selected>' + esc(cur) + '</option>' + html;
+    return html;
+  }
+  function render() {
+    if (!state) return;
+    document.getElementById('daemonInfo').textContent = '守护进程 pid ' + state.pid + ' · 配置页端口 ' + state.guiPort + ' · 共 ' + state.profiles.length + ' 个通道';
+    var list = document.getElementById('list');
+    if (!state.profiles.length) {
+      list.innerHTML = '<div class="card"><span class="muted">还没有通道，先在上面「新增通道」里加一个（比如 5777）。</span></div>';
+    } else {
+      var html = '';
+      for (var i = 0; i < state.profiles.length; i++) html += card(state.profiles[i]);
+      list.innerHTML = html;
+    }
+    var d = state.defaults || {};
+    fillTtlSelect(document.getElementById('setTtl'), d.ttl);
+    document.getElementById('setPwMode').value = d.passwordMode === 'fixed' ? 'fixed' : 'random';
+    document.getElementById('setGwStart').value = d.gatewayStart;
+    document.getElementById('setRateLimit').value = d.rateLimit;
+    document.getElementById('setMcp').checked = !!(state.mcp && state.mcp.enabled);
+    document.getElementById('setTray').checked = !!(state.tray && state.tray.enabled);
+    if (!document.getElementById('addTtl').options.length) fillTtlSelect(document.getElementById('addTtl'), d.ttl);
+  }
+  function refresh() { return api('/api/state').then(function (s) { state = s; render(); }).catch(function (e) { toast('读取状态失败: ' + e.message, true); }); }
+
+  document.addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-act]');
+    if (!el) return;
+    var act = el.getAttribute('data-act');
+    var id = el.getAttribute('data-id');
+    var done = function (p) { return p.then(function () { return refresh(); }).then(function () { toast('已执行: ' + act); }).catch(function (e) { toast(e.message, true); }); };
+    if (act === 'refresh') return done(refresh());
+    if (act === 'copy') {
+      var v = el.getAttribute('data-copy') || '';
+      if (navigator.clipboard) navigator.clipboard.writeText(v).then(function () { toast('已复制'); }, function () { toast('复制失败，请手动选中', true); });
+      else toast('浏览器不支持剪贴板 API', true);
+      return;
+    }
+    if (act === 'togglePw') {
+      var span = document.querySelector('[data-pw="' + id + '"]');
+      var s = (state.profiles || []).filter(function (x) { return x.id === id; })[0] || {};
+      var hidden = span.getAttribute('data-hidden') === '1';
+      span.textContent = hidden ? (s.password || '（未生成）') : '••••••••';
+      span.setAttribute('data-hidden', hidden ? '0' : '1');
+      el.textContent = hidden ? '隐藏' : '显示';
+      return;
+    }
+    if (act === 'log') {
+      return api('/api/log?id=' + encodeURIComponent(id)).then(function (r) {
+        openLogs[id] = r.log || '(空)';
+        render();
+      }).catch(function (e) { toast(e.message, true); });
+    }
+    if (act === 'save') {
+      var ttl = document.querySelector('[data-edit="ttl"][data-id="' + id + '"]').value;
+      var mode = document.querySelector('[data-edit="pwmode"][data-id="' + id + '"]').value;
+      var pwd = document.querySelector('[data-edit="password"][data-id="' + id + '"]').value;
+      var patch = { ttl: ttl, passwordMode: mode };
+      if (mode === 'fixed') patch.password = pwd;
+      return done(api('/api/profile', { id: id, patch: patch }).then(function () { toast('已保存（重新启动后生效）'); }));
+    }
+    if (act === 'del') {
+      if (!confirm('确定删除通道 ' + id + ' ？（会先停止它）')) return;
+      return done(api('/api/delete', { id: id }));
+    }
+    if (act === 'enable' || act === 'autostart') {
+      var on = el.getAttribute('data-on') === '1';
+      var action = act === 'enable' ? (on ? 'enable' : 'disable') : (on ? 'autoStartOn' : 'autoStartOff');
+      return done(api('/api/action', { action: action, id: id }));
+    }
+    if (act === 'regen') return done(api('/api/action', { action: 'regenPassword', id: id }));
+    if (act === 'start' || act === 'stop') {
+      el.disabled = true;
+      return done(api('/api/action', { action: act, id: id }));
+    }
+  });
+
+  document.addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-act="startAll"],[data-act="stopAll"],[data-act="add"],[data-act="saveSettings"]');
+    if (!el) return;
+    var act = el.getAttribute('data-act');
+    var p;
+    if (act === 'startAll') p = api('/api/action', { action: 'startAll' });
+    else if (act === 'stopAll') p = api('/api/action', { action: 'stopAll' });
+    else if (act === 'saveSettings') p = api('/api/settings', {
+      defaults: { ttl: document.getElementById('setTtl').value, passwordMode: document.getElementById('setPwMode').value, gatewayStart: Number(document.getElementById('setGwStart').value), rateLimit: Number(document.getElementById('setRateLimit').value) },
+      mcp: { enabled: document.getElementById('setMcp').checked },
+      tray: { enabled: document.getElementById('setTray').checked }
+    });
+    else if (act === 'add') {
+      var profile = {
+        name: document.getElementById('addName').value,
+        port: Number(document.getElementById('addPort').value),
+        gateway: document.getElementById('addGateway').value ? Number(document.getElementById('addGateway').value) : undefined,
+        ttl: document.getElementById('addTtl').value,
+        passwordMode: document.getElementById('addPwMode').value,
+        password: document.getElementById('addPassword').value,
+        autoStart: document.getElementById('addAuto').checked,
+        noTunnel: document.getElementById('addNoTunnel').checked
+      };
+      Object.keys(profile).forEach(function (k) { if (profile[k] === undefined) delete profile[k]; });
+      p = api('/api/profile', { profile: profile });
+    }
+    p.then(function () { return refresh(); }).then(function () { toast('完成: ' + act); }).catch(function (e) { toast(e.message, true); });
+  });
+
+  setInterval(function () {
+    if (document.hidden || !state) return;
+    for (var i = 0; i < state.profiles.length; i++) {
+      var s = state.profiles[i];
+      var el = document.querySelector('[data-remain="' + s.id + '"]');
+      if (el) el.textContent = remainText(s);
+    }
+  }, 1000);
+  setInterval(function () { if (!document.hidden) refresh(); }, 3000);
+  refresh();
+})();
+</script>
+</body>
+</html>
