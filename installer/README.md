@@ -1,5 +1,8 @@
 # 临时公网映射 public-tunnel（免安装 exe 版）
 
+> English documentation: https://github.com/Thunderunruly/one-click-tunnel#readme
+> English changelog: https://github.com/Thunderunruly/one-click-tunnel/blob/main/CHANGELOG.md
+
 把本机某个端口临时暴露到公网（Cloudflare Quick Tunnel），外面的人必须先输密码才能访问，
 到点自动关闭。不需要管理员权限，所有文件都在当前用户目录里。
 
