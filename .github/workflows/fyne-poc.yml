@@ -104,8 +104,14 @@ jobs:
         run: ls -lR dist-poc
       - name: Publish to the poc-fyne pre-release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view poc-fyne >/dev/null 2>&1 \
-            && gh release upload poc-fyne dist-poc/* --clobber \
-            || gh release create poc-fyne dist-poc/* --prerelease --title "Fyne PoC (Windows / macOS / Linux)" --notes "实验性 PoC 构建：只用于验证 Fyne 桌面壳（窗口/托盘/中文输入法），不是产品版本。三类产物：oct-poc-windows.exe（双击，GUI 子系统无控制台）、oct-poc-macos（先 chmod +x，未签名需右键打开或 xattr 去隔离；注意是 arm64）、oct-poc-linux（先 chmod +x，需要 libgl1 + 一组 libX* 运行库）。"
+          set -x
+          gh --version
+          ls -l dist-poc
+          if ! gh release view poc-fyne >/dev/null 2>&1; then
+            echo "creating release poc-fyne"
+            gh release create poc-fyne --prerelease --title "Fyne PoC (Windows / macOS / Linux)" --notes "实验性 PoC 构建：只用于验证 Fyne 桌面壳（窗口 / 托盘 / 中文输入法），不是产品版本。"
+          fi
+          gh release upload poc-fyne dist-poc/* --clobber
+          echo done
