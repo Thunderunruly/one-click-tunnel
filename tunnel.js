@@ -39,6 +39,15 @@ const HERE = (function () {
 })();
 const LOG_DIR = path.join(HERE, 'logs');
 
+// 兜底：任何未捕获的 socket/子进程错误都不允许杀死隧道进程。
+// 2026-09-20 曾因客户端连接被重置（read ECONNRESET）未捕获 → 隧道进程静默退出 → 域名失效。
+process.on('uncaughtException', (err) => {
+  try { console.error('[tunnel] uncaughtException:', (err && (err.code || err.message)) || err); } catch {}
+});
+process.on('unhandledRejection', (reason) => {
+  try { console.error('[tunnel] unhandledRejection:', (reason && (reason.code || reason.message)) || reason); } catch {}
+});
+
 // ---------------- 参数 ----------------
 function parseArgs(argv) {
   const out = { port: 3000, ttl: '1h', password: '', gateway: 18080, host: '127.0.0.1',

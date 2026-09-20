@@ -1,6 +1,6 @@
 {
   "name": "one-click-tunnel",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Password-gated temporary public tunnels for Windows: local config page + system tray + MCP (AI) + CLI, built on Cloudflare Quick Tunnels.",
   "license": "MIT",
   "author": "Haosheng Yao",

@@ -12,6 +12,14 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# 单实例：已经有一个托盘在跑就直接退出，避免出现一堆重复图标
+$script:createdNew = $false
+$script:mutex = New-Object System.Threading.Mutex($true, 'Local\one-click-tunnel-tray', [ref]$script:createdNew)
+if (-not $script:createdNew) {
+  Write-Output '已经有一个托盘在运行，本次退出'
+  exit 0
+}
+
 $base = 'http://127.0.0.1:' + $GuiPort
 $headers = @{ 'x-tunnel-token' = $Token }
 $guiUrl = $base + '/?token=' + $Token
@@ -66,17 +74,11 @@ $miStatus.add_Click({
   $text = $(if ($lines.Count -gt 0) { $lines -join [Environment]::NewLine } else { '当前没有运行中的通道' })
   & $script:balloon ('运行中 ' + $run.Count + ' / 共 ' + @($st.profiles).Count + ' 个通道') $text
 })
-$miQuitTray.add_Click({
-  $script:notify.Visible = $false
-  $script:notify.Dispose()
-  [System.Windows.Forms.Application]::Exit()
-})
+$miQuitTray.add_Click({ Exit-Tray })
 $miQuit.add_Click({
   try { Invoke-RestMethod -Uri ($base + '/api/shutdown') -Method Post -Headers $headers -ContentType 'application/json' -Body '{}' -TimeoutSec 8 | Out-Null } catch {}
   Start-Sleep -Milliseconds 600
-  $script:notify.Visible = $false
-  $script:notify.Dispose()
-  [System.Windows.Forms.Application]::Exit()
+  Exit-Tray
 })
 $script:notify.ContextMenuStrip = $menu
 $script:notify.add_DoubleClick({ try { Start-Process $guiUrl } catch {} })
@@ -85,20 +87,25 @@ $script:notify.add_MouseClick({
   if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left) { & $miStatus.PerformClick() }
 })
 
+function Exit-Tray {
+  try { $script:notify.Visible = $false; $script:notify.Dispose() } catch {}
+  try { if ($script:mutex) { $script:mutex.ReleaseMutex() } } catch {}
+  [System.Windows.Forms.Application]::Exit()
+}
+
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 3000
+$script:misses = 0
 $timer.add_Tick({
-  if ($ParentPid -gt 0) {
-    $alive = $null
-    try { $alive = Get-Process -Id $ParentPid -ErrorAction Stop } catch { $alive = $null }
-    if (-not $alive) {
-      $script:notify.Visible = $false
-      $script:notify.Dispose()
-      [System.Windows.Forms.Application]::Exit()
-      return
-    }
-  }
+  # 看门狗：连续 3 次拉不到守护进程状态就自己退出（守护进程没了，托盘图标不该赖着不走）
   $st = Get-State
+  if (-not $st) {
+    $script:misses = $script:misses + 1
+    if ($script:misses -ge 3) { Exit-Tray; return }
+    $script:notify.Text = '临时公网映射：后台服务未响应'
+    return
+  }
+  $script:misses = 0
   if (-not $st) { $script:notify.Text = '临时公网映射：守护进程未响应'; return }
   $run = @($st.profiles | Where-Object { $_.running })
   $tip = '临时公网映射：' + $run.Count + ' 个运行中 / 共 ' + @($st.profiles).Count + ' 个通道'

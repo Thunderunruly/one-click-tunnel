@@ -49,6 +49,20 @@ The classic single-tunnel flags still work exactly as before:
 
     public-tunnel.exe --port 3000 --ttl 1h --password mypassword
 
+## Where is the tray icon?
+
+The tray is **not** part of the web page - a browser page cannot own a notification-area icon. The background
+daemon starts a tiny Windows process (PowerShell WinForms, no extra dependency) that shows the icon:
+
+- Windows 11 hides new tray icons by default: click the **^** (show hidden icons) next to the clock, or open
+  设置 → 个性化 → 任务栏 → 其他系统托盘图标 and switch "one-click-tunnel / 临时公网映射" on to keep it visible.
+- The icon only lives while the daemon runs. In 1.2.x the daemon lived in the console window, so closing that
+  window killed the tray as well. From 1.3.0 the launcher is windowless and the daemon is detached, so closing
+  the app window keeps the tunnels **and** the tray alive.
+- Start it manually any time: public-tunnel.exe tray  (reuses the running daemon; exits if one is already there)
+- Turn it off: config page -> 全局设置 -> 托盘, or tray.enabled=false in config.json.
+- If the daemon dies, the tray closes itself within ~10 seconds (watchdog), so no ghost icons are left behind.
+
 ## Desktop app (no console window)
 
 The shortcut starts the background daemon **hidden** and opens the config page inside a chromeless desktop
@@ -407,3 +421,13 @@ delete_tunnel、set_password、tunnel_status、stop_all。
 - 附加：开始菜单里多了一个「one-click-tunnel 全部关闭」（stop-all.vbs，无控制台，关完弹提示）
 - 手动打开窗口：tunnel app（守护进程没跑会自动拉起）；想用普通浏览器标签页：tunnel gui --browser
 - 默认端口和文档示例从 5777 改成中性的 3000（tunnel 不带 --port 时默认映射 127.0.0.1:3000）
+
+
+---
+
+# 1.3.1：托盘健壮性 + 说明
+
+- 单实例互斥锁：不会出现一堆重复的托盘图标（已有托盘时新的直接退出）
+- 看门狗改成"守护进程还活着吗"：连续 3 次取不到状态就自己消失，不再依赖父进程 pid（避免 pid 复用留下僵尸图标）
+- 命令行提示与配置页都写清楚了：图标在任务栏右下角，Win11 默认收进 ^ 溢出区，可拖出来固定显示
+- 网页里永远不会有托盘：浏览器页面拿不到通知区域图标，托盘是后台进程提供的
