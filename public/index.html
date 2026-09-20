@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>临时公网映射 · 配置页</title>
+<title>临时公网映射</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -112,8 +112,8 @@
     <div class="row"><strong>新增通道</strong><span class="muted">一个通道 = 一个本机端口 + 一个独立密码 + 一个独立到期时间</span></div>
     <hr>
     <div class="grid">
-      <div class="field"><label>名称</label><input id="addName" placeholder="例如 前端 5777"></div>
-      <div class="field"><label>本机端口</label><input id="addPort" type="number" min="1" max="65535" placeholder="5777"></div>
+      <div class="field"><label>名称</label><input id="addName" placeholder="例如 前端 3000"></div>
+      <div class="field"><label>本机端口</label><input id="addPort" type="number" min="1" max="65535" placeholder="3000"></div>
       <div class="field"><label>网关端口（留空自动分配）</label><input id="addGateway" type="number" min="1024" max="65535" placeholder="自动"></div>
       <div class="field"><label>有效期</label><select id="addTtl"></select></div>
       <div class="field"><label>密码</label>
@@ -237,7 +237,7 @@
     document.getElementById('daemonInfo').textContent = '守护进程 pid ' + state.pid + ' · 配置页端口 ' + state.guiPort + ' · 共 ' + state.profiles.length + ' 个通道';
     var list = document.getElementById('list');
     if (!state.profiles.length) {
-      list.innerHTML = '<div class="card"><span class="muted">还没有通道，先在上面「新增通道」里加一个（比如 5777）。</span></div>';
+      list.innerHTML = '<div class="card"><span class="muted">还没有通道，先在上面「新增通道」里加一个（比如 3000）。</span></div>';
     } else {
       var html = '';
       for (var i = 0; i < state.profiles.length; i++) html += card(state.profiles[i]);

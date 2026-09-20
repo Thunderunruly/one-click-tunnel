@@ -37,7 +37,7 @@ Verify your download against SHA256SUMS.txt in the release assets.
     public-tunnel.exe tray
 
     # 3. command line, many tunnels
-    public-tunnel.exe add --name web --port 5777 --ttl 1h --auto-start
+    public-tunnel.exe add --name web --port 3000 --ttl 1h --auto-start
     public-tunnel.exe start web
     public-tunnel.exe list
     public-tunnel.exe stop --all
@@ -47,7 +47,17 @@ Verify your download against SHA256SUMS.txt in the release assets.
 
 The classic single-tunnel flags still work exactly as before:
 
-    public-tunnel.exe --port 5777 --ttl 1h --password mypassword
+    public-tunnel.exe --port 3000 --ttl 1h --password mypassword
+
+## Desktop app (no console window)
+
+The shortcut starts the background daemon **hidden** and opens the config page inside a chromeless desktop
+window (Edge/Chrome app mode: no address bar, no tabs, its own taskbar entry and icon). Closing that window
+does **not** stop the tunnels - the tray icon stays, and the tray menu (or the "全部关闭" shortcut) quits
+everything. No cmd window appears: the shortcut runs a .vbs launcher and the daemon is spawned detached+hidden.
+
+    public-tunnel.exe app             # open the desktop window (starts the daemon when needed)
+    public-tunnel.exe gui --browser   # use a normal browser tab instead of the app window
 
 ## Config file (config.json, next to the exe)
 
@@ -62,8 +72,8 @@ The classic single-tunnel flags still work exactly as before:
                   "autoDownload": false, "includePrerelease": false,
                   "downloadMirror": "", "ignoredVersion": "" },
       "profiles": [
-        { "id": "web", "name": "web 5777", "enabled": true, "autoStart": false,
-          "port": 5777, "gateway": 18080, "ttl": "30m",
+        { "id": "web", "name": "web 3000", "enabled": true, "autoStart": false,
+          "port": 3000, "gateway": 18080, "ttl": "30m",
           "passwordMode": "random", "password": "", "host": "127.0.0.1" }
       ]
     }
@@ -145,12 +155,12 @@ MIT licensed. cloudflared is a separate binary by Cloudflare (Apache-2.0).
 
 ## 快速开始
 
-双击 `start.cmd`（默认映射 5777，1 小时后自动关闭，自动生成密码并打印）。
+双击 `start.cmd`（默认映射 3000，1 小时后自动关闭，自动生成密码并打印）。
 
 命令行用法：
 
 ```bat
-start.cmd                                   :: 映射 5777，TTL 1h，随机密码
+start.cmd                                   :: 映射 3000，TTL 1h，随机密码
 start.cmd --port 8090 --ttl 30m             :: 映射 8090，30 分钟后自动关闭
 start.cmd --port 8091 --ttl 1h --password mypass123
 ```
@@ -158,14 +168,14 @@ start.cmd --port 8091 --ttl 1h --password mypass123
 或直接：
 
 ```bash
-node tunnel.js --port 5777 --ttl 1h --password 你的密码
+node tunnel.js --port 3000 --ttl 1h --password 你的密码
 ```
 
 ## 参数
 
 | 参数 | 说明 | 默认 |
 |---|---|---|
-| `--port, -p` | 要映射的本机端口 | 5777 |
+| `--port, -p` | 要映射的本机端口 | 3000 |
 | `--ttl, -t` | 有效期：`90s` / `30m` / `1h` / 秒数 | 1h |
 | `--password, -P` | 访问密码（不传则自动生成并打印） | 随机 |
 | `--gateway, -g` | 本地网关端口 | 18080 |
@@ -292,7 +302,7 @@ TRACE/CONNECT/绝对形式请求行、Host 改写与透传、XFF 与 x-real-ip �
 ## 三种开启方式（同一份配置、同一份状态）
 
 1. 命令行（经典单通道，参数和以前完全一样）
-   tunnel --port 5777 --ttl 1h --password 自定义
+   tunnel --port 3000 --ttl 1h --password 自定义
 2. 图形化配置页 + 托盘（推荐）
    tunnel gui --open        打开配置页 http://127.0.0.1:18400/?token=xxx ，并最小化到托盘
    tunnel tray              只留托盘图标（守护进程自动拉起）
@@ -304,7 +314,7 @@ TRACE/CONNECT/绝对形式请求行、Host 改写与透传、XFF 与 x-real-ip �
 也可以只用 CLI 的多通道子命令（后台守护进程执行）：
 
     tunnel list                          列出所有通道与状态
-    tunnel add --name 前端 --port 5777 --ttl 1h --auto-start
+    tunnel add --name 前端 --port 3000 --ttl 1h --auto-start
     tunnel start 前端 | --all            启动（可同时开多个）
     tunnel stop  前端 | --all
     tunnel enable|disable <id>           启用 / 停用
@@ -322,8 +332,8 @@ TRACE/CONNECT/绝对形式请求行、Host 改写与透传、XFF 与 x-real-ip �
       "defaults": { "ttl": "1h", "passwordMode": "random", "host": "127.0.0.1",
                     "gatewayStart": 18080, "rateLimit": 3000 },
       "profiles": [
-        { "id": "前端-5777", "name": "前端 5777", "enabled": true, "autoStart": false,
-          "port": 5777, "gateway": 18080, "ttl": "1h",
+        { "id": "前端-3000", "name": "前端 3000", "enabled": true, "autoStart": false,
+          "port": 3000, "gateway": 18080, "ttl": "1h",
           "passwordMode": "random", "password": "", "host": "127.0.0.1",
           "rateLimit": 3000, "upstreamHost": "", "allowHosts": [], "noTunnel": false }
       ]
@@ -385,3 +395,15 @@ delete_tunnel、set_password、tunnel_status、stop_all。
 - 检查结果缓存在 state/update.json，配置页 / CLI / MCP 共用同一份，避免频繁请求（还会用 ETag 做 304 协商）
 
     node test-update.mjs      # 31 项：检查/缓存/ETag/预发布/下载校验/镜像/忽略/各种异常路径（本地假 GitHub API，离线可跑）
+
+
+---
+
+# 1.3 版：桌面窗口（不再弹 cmd）+ 端口示例中立化
+
+- 快捷方式现在执行 launch.vbs（wscript，**完全没有命令行窗口**）：隐藏启动后台守护进程 → 打开**桌面窗口**
+- 桌面窗口 = Edge/Chrome 的 app 模式：没有地址栏、没有标签页，任务栏里是一个独立的应用窗口和图标
+- 关掉窗口**不会**停止隧道：托盘图标继续在，托盘菜单里可以「全部启动/全部停止/退出」
+- 附加：开始菜单里多了一个「one-click-tunnel 全部关闭」（stop-all.vbs，无控制台，关完弹提示）
+- 手动打开窗口：tunnel app（守护进程没跑会自动拉起）；想用普通浏览器标签页：tunnel gui --browser
+- 默认端口和文档示例从 5777 改成中性的 3000（tunnel 不带 --port 时默认映射 127.0.0.1:3000）

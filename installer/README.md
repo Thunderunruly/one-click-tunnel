@@ -24,7 +24,7 @@
 
 也可以命令行运行（参数见 public-tunnel.exe --help）：
 
-    public-tunnel.exe                         把 127.0.0.1:5777 映射出去，1 小时，随机密码
+    public-tunnel.exe                         把 127.0.0.1:3000 映射出去，1 小时，随机密码
     public-tunnel.exe --port 8090 --ttl 30m   映射 8090 端口，30 分钟
     public-tunnel.exe --port 3081 --ttl 6h --password 自定义密码
     public-tunnel.exe --no-tunnel             只起本地密码门，不建公网隧道（排障用）

@@ -86,7 +86,7 @@ run(npxCmd, ['--yes', 'postject', OUT, 'NODE_SEA_BLOB', blob, '--sentinel-fuse',
 const cfSrc = path.join(ROOT, 'cloudflared.exe');
 if (fs.existsSync(cfSrc)) { fs.copyFileSync(cfSrc, path.join(DIST, 'cloudflared.exe')); console.log('已复制 cloudflared.exe'); }
 else console.log('注意: 没找到 cloudflared.exe，exe 首次运行会自动下载');
-for (const f of ['install.cmd', 'install.ps1', 'uninstall.cmd', 'uninstall.ps1', 'start.cmd', 'tray.cmd', 'stop-all.cmd', 'stop.cmd', 'README.md']) {
+for (const f of ['install.cmd', 'install.ps1', 'uninstall.cmd', 'uninstall.ps1', 'start.cmd', 'tray.cmd', 'stop-all.cmd', 'stop-all.vbs', 'launch.vbs', 'stop.cmd', 'README.md']) {
   const s = path.join(ROOT, 'installer', f);
   if (fs.existsSync(s)) fs.copyFileSync(s, path.join(DIST, f));
 }

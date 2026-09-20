@@ -3,12 +3,12 @@
  * 临时公网映射小工具（Cloudflare Quick Tunnel + 密码门 + 定时自动关闭）
  *
  * 用法：
- *   node tunnel.js                       # 默认把 5777 映射出去，1 小时后自动关闭，自动生成密码
+ *   node tunnel.js                       # 默认把 3000 映射出去，1 小时后自动关闭，自动生成密码
  *   node tunnel.js --port 8090 --ttl 30m --password 我的密码
  *   start.cmd --port 8091 --ttl 1h       # Windows 双击/命令行
  *
  * 参数：
- *   --port <n>        要映射的本机端口（默认 5777）
+ *   --port <n>        要映射的本机端口（默认 3000）
  *   --ttl <dur>       有效期，如 60m / 1h / 90s / 3600（默认 1h），到点自动杀掉隧道并退出
  *   --password <pwd>  访问密码（不给则自动生成，命令行与日志里会打印）
  *   --gateway <n>     本地网关端口（默认 18080）
@@ -41,7 +41,7 @@ const LOG_DIR = path.join(HERE, 'logs');
 
 // ---------------- 参数 ----------------
 function parseArgs(argv) {
-  const out = { port: 5777, ttl: '1h', password: '', gateway: 18080, host: '127.0.0.1',
+  const out = { port: 3000, ttl: '1h', password: '', gateway: 18080, host: '127.0.0.1',
     upstreamHost: '', cloudflared: '', noDownload: false, noTunnel: false, open: false, forcePublicGateway: false, rateLimit: 3000, allowHosts: [],
     runProfile: '', config: '', stateFile: '', name: '' };
   for (let i = 0; i < argv.length; i++) {
@@ -71,11 +71,12 @@ function parseArgs(argv) {
 function printHelp() {
   console.log('用法: tunnel [选项]');
   console.log('');
-  console.log('  --port, -p <端口>        要暴露的本机服务端口（默认 5777）');
+  console.log('  --port, -p <端口>        要暴露的本机服务端口（默认 3000）');
   console.log('  --ttl, -t <时长>         存活时长，如 30m / 2h / 1d（默认 1h，从公网地址就绪起算）');
   console.log('  --password, -P <密码>    访问密码（默认随机生成，也可用环境变量 TUNNEL_PASSWORD）');
   console.log('  --gateway, -g <端口>     本地密码门端口（默认 18080，只监听 127.0.0.1）');
   console.log('  --host <地址>            密码门监听地址（仅允许回环，默认 127.0.0.1）');
+  console.log('  --app / --browser        启动时用桌面窗口（默认）还是普通浏览器打开配置页');
   console.log('  --cloudflared <路径>     指定 cloudflared.exe（默认用同目录下的）');
   console.log('  --no-download            缺 cloudflared.exe 时不自动下载');
   console.log('  --rate-limit <次数>      每客户端 IP 每分钟请求上限（默认 3000）');
@@ -642,7 +643,7 @@ async function main() {
 // 子命令走 lib/cli.js（GUI / 托盘 / MCP / 多通道管理）；以 - 开头的老参数仍然是"前台单通道"模式
 const SUBCOMMANDS = ['gui', 'tray', 'mcp', 'list', 'status', 'start', 'stop', 'enable', 'disable',
   'autostart-on', 'autostart-off', 'regen', 'add', 'rm', 'remove', 'delete', 'config', 'api', 'daemon', 'help',
-  'update', 'version'];
+  'update', 'version', 'app'];
 const ARGV = process.argv.slice(2);
 if (ARGV.length && !ARGV[0].startsWith('-') && SUBCOMMANDS.includes(ARGV[0])) {
   require('./lib/cli.js').run(ARGV[0], ARGV.slice(1))

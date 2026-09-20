@@ -36,7 +36,7 @@ if (Test-Path $InstallDir) {
 }
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
-foreach ($f in @($exeName, 'cloudflared.exe', 'start.cmd', 'tray.cmd', 'stop-all.cmd', 'stop.cmd', 'README.md')) {
+foreach ($f in @($exeName, 'cloudflared.exe', 'start.cmd', 'tray.cmd', 'stop-all.cmd', 'stop-all.vbs', 'launch.vbs', 'stop.cmd', 'README.md')) {
   $s = Join-Path $src $f
   if (Test-Path $s) { Copy-Item $s (Join-Path $InstallDir $f) -Force; Say ('  已安装 ' + $f) }
 }
@@ -64,7 +64,8 @@ if (-not $NoShortcut) {
       $dir = Split-Path -Parent $t
       if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
       $lnk = $ws.CreateShortcut($t)
-      $lnk.TargetPath = Join-Path $InstallDir 'start.cmd'
+      $lnk.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
+      $lnk.Arguments = '//nologo "' + (Join-Path $InstallDir 'launch.vbs') + '"'
       $lnk.WorkingDirectory = $InstallDir
       $lnk.IconLocation = ($srcExe + ',0')
       $lnk.Description = '临时把本机端口映射到公网（带密码门 + 定时自动关闭）'
@@ -92,7 +93,7 @@ Say '  已注册到「设置 → 应用」卸载列表'
 Say ''
 Say '安装完成。'
 Say ('  启动: 双击桌面「临时公网映射」，或运行 ' + (Join-Path $InstallDir 'start.cmd'))
-Say '  默认: 把 127.0.0.1:5777 映射出去，1 小时后自动关闭，密码随机生成并显示在窗口里'
+Say '  默认: 把 127.0.0.1:3000 映射出去，1 小时后自动关闭，密码随机生成并显示在窗口里'
 Say ('  卸载: ' + $uninstallPath + '   或「设置 → 应用」里卸载')
 Say ''
 
