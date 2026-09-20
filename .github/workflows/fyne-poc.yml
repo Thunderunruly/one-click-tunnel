@@ -109,9 +109,9 @@ jobs:
           set -x
           gh --version
           ls -l dist-poc
-          if ! gh release view poc-fyne >/dev/null 2>&1; then
+          if ! gh release view poc-fyne --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "creating release poc-fyne"
-            gh release create poc-fyne --prerelease --title "Fyne PoC (Windows / macOS / Linux)" --notes "实验性 PoC 构建：只用于验证 Fyne 桌面壳（窗口 / 托盘 / 中文输入法），不是产品版本。"
+            gh release create poc-fyne --repo "$GITHUB_REPOSITORY" --prerelease --title "Fyne PoC (Windows / macOS / Linux)" --notes "实验性 PoC 构建：只用于验证 Fyne 桌面壳（窗口 / 托盘 / 中文输入法），不是产品版本。"
           fi
-          gh release upload poc-fyne dist-poc/* --clobber
+          gh release upload poc-fyne --repo "$GITHUB_REPOSITORY" dist-poc/* --clobber
           echo done

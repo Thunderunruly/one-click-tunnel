@@ -55,10 +55,10 @@ jobs:
       - name: Named tunnel / custom domain tests (36, offline)
         run: node test-named.mjs
 
-      - name: Upstream target tests (20: localhost / LAN device / open-proxy guard)
+      - name: 'Upstream target tests (20: localhost / LAN device / open-proxy guard)'
         run: node test-upstream.mjs
 
-      - name: Port isolation tests (11: a tunnel can only ever reach its own port)
+      - name: 'Port isolation tests (11: a tunnel can only ever reach its own port)'
         run: node test-port-isolation.mjs
 
       - name: Download cloudflared (needed by the installer test)
