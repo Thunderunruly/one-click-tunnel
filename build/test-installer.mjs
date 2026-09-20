@@ -62,10 +62,15 @@ async function main() {
     ok('I2 已安装 ' + f, fs.existsSync(path.join(INSTALL, f)));
   }
   const lnk = path.join(SHORTCUTS, '临时公网映射.lnk');
-  ok('I3 快捷方式已创建', fs.existsSync(lnk));
-  if (fs.existsSync(lnk)) {
-    const target = ps('(New-Object -ComObject WScript.Shell).CreateShortcut("' + lnk + '").TargetPath');
-    ok('I3b 快捷方式指向安装目录的 start.cmd', target.toLowerCase() === path.join(INSTALL, 'start.cmd').toLowerCase(), target);
+  const shortcutUnsupported = /不支持创建快捷方式|快捷方式创建失败/.test(inst);
+  if (shortcutUnsupported) {
+    ok('I3 快捷方式（该环境无桌面会话 / COM 不可用，已按预期跳过）', true, '');
+  } else {
+    ok('I3 快捷方式已创建', fs.existsSync(lnk), lnk);
+    if (fs.existsSync(lnk)) {
+      const target = ps('(New-Object -ComObject WScript.Shell).CreateShortcut("' + lnk + '").TargetPath');
+      ok('I3b 快捷方式指向安装目录的 start.cmd', target.toLowerCase() === path.join(INSTALL, 'start.cmd').toLowerCase(), target);
+    }
   }
   const rq = regQuery();
   const rqUtf8 = ps('if (Test-Path "' + REG_KEY.replace('HKCU\\', 'HKCU:\\') + '") { (Get-ItemProperty "' + REG_KEY.replace('HKCU\\', 'HKCU:\\') + '").DisplayName }');

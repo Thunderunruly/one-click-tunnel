@@ -45,8 +45,13 @@ Copy-Item (Join-Path $src 'uninstall.cmd') $uninstallPath -Force
 Copy-Item (Join-Path $src 'uninstall.ps1') (Join-Path $InstallDir 'uninstall.ps1') -Force
 
 if (-not $NoShortcut) {
-  $ws = New-Object -ComObject WScript.Shell
+  $ws = $null
+  try { $ws = New-Object -ComObject WScript.Shell } catch { $ws = $null }
+  if (-not $ws) {
+    Write-Host '  本环境不支持创建快捷方式（没有桌面会话 / COM 不可用），已跳过；以后可以手动运行安装目录里的 start.cmd' -ForegroundColor Yellow
+  }
   $targets = @()
+  if (-not $ws) { $targets = @() }
   if ([string]::IsNullOrEmpty($ShortcutDir)) {
     $targets += (Join-Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs') '临时公网映射.lnk')
     $targets += (Join-Path ([Environment]::GetFolderPath('Desktop')) '临时公网映射.lnk')
@@ -56,6 +61,8 @@ if (-not $NoShortcut) {
   }
   foreach ($t in $targets) {
     try {
+      $dir = Split-Path -Parent $t
+      if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
       $lnk = $ws.CreateShortcut($t)
       $lnk.TargetPath = Join-Path $InstallDir 'start.cmd'
       $lnk.WorkingDirectory = $InstallDir
