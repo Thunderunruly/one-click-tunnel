@@ -113,7 +113,9 @@ async function main() {
     latestVersion: '1.4.0', hasUpdate: true, ignored: false, htmlUrl: 'https://example.invalid' }, null, 2));
   const staleState = await req(port, 'GET', '/api/state', { headers: { 'x-tunnel-token': token } });
   const su = (staleState.json && staleState.json.update) || {};
-  ok('G16e 升级后不再拿旧缓存提示"有新版"', su.hasUpdate === false && su.latestVersion === '1.4.0' && su.staleCache === true,
+  // 关键性质：不管后台有没有来得及重查，都绝不能再出现"最新版本比当前版本还旧却提示有更新"
+  const consistent = su.hasUpdate === false && (su.latestVersion === '1.4.0' ? su.staleCache === true : true);
+  ok('G16e 升级后不再拿旧缓存提示"有新版"（且状态自洽）', consistent,
     JSON.stringify({ has: su.hasUpdate, latest: su.latestVersion, stale: su.staleCache, cur: su.currentVersion }));
 
   const updNoTok = await req(port, 'GET', '/api/update');
