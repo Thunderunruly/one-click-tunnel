@@ -32,7 +32,7 @@ jobs:
             node --check $_.FullName
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
-          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-update.mjs','test-exe.mjs','test-tray.mjs','build/test-installer.mjs')) {
+          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-update.mjs','test-named.mjs','test-exe.mjs','test-tray.mjs','build/test-installer.mjs')) {
             node --check $f
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
@@ -51,6 +51,9 @@ jobs:
 
       - name: Update checker tests (31)
         run: node test-update.mjs
+
+      - name: Named tunnel / custom domain tests (30, offline)
+        run: node test-named.mjs
 
       - name: Download cloudflared (needed by the installer test)
         shell: pwsh

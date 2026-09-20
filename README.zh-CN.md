@@ -32,6 +32,25 @@ node tunnel.js --port 3000 --ttl 1h --password 你的密码
 | `--gateway, -g` | 本地网关端口 | 18080 |
 | `--host` | 网关监听地址（**别改成 0.0.0.0**） | 127.0.0.1 |
 
+## 自有域名（命名隧道，地址永久固定）
+
+快速隧道每次都是随机地址（`xxxx.trycloudflare.com`，重启就换）。如果你的域名托管在 Cloudflare，
+可以让通道用一个**永久固定**的地址：
+
+    tunnel login                        浏览器授权一次（选择你的域名）
+    tunnel domain web app.example.com   建命名隧道 + 加 DNS 记录 + 写回配置
+    tunnel start web                    之后就一直走 https://app.example.com
+
+- 授权证书存在 `state/cloudflare/cert.pem`，一个账号只需要登录一次
+- 建隧道时会把凭据复制到 `state/cloudflare/`，并把配置改成 `mode=named` + `ttl=forever`
+- **公网地址背后仍然是本机密码门**：域名固定不等于对外开放，访问依旧要密码
+- `tunnel info [id]` 看类型/域名/隧道ID/还差什么；`--dry-run` 只生成配置不启动（排障用）
+- 配置页里有「登录 Cloudflare」按钮，每条通道卡片上可以切换 快速/命名 隧道并绑定域名
+- AI 也能做：MCP 工具 `cloudflare_login` / `set_custom_domain` / `cloudflare_status`
+- 前提：域名 DNS 由 Cloudflare 托管（免费版就行）
+
+生成的 cloudflared 配置（`state/cloudflare/<id>.cloudflared.yml`）把域名指向**本地密码门**，业务端口不会被直接暴露。
+
 ## 工作方式
 
 ```

@@ -52,7 +52,8 @@ process.on('unhandledRejection', (reason) => {
 function parseArgs(argv) {
   const out = { port: 3000, ttl: '1h', password: '', gateway: 18080, host: '127.0.0.1',
     upstreamHost: '', cloudflared: '', noDownload: false, noTunnel: false, open: false, forcePublicGateway: false, rateLimit: 3000, allowHosts: [],
-    runProfile: '', config: '', stateFile: '', name: '' };
+    runProfile: '', config: '', stateFile: '', name: '',
+    tunnelMode: '', hostname: '', tunnelName: '', dryRun: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -69,6 +70,7 @@ function parseArgs(argv) {
     else if (a === '--config') out.config = String(next());
     else if (a === '--state-file') out.stateFile = String(next());
     else if (a === '--name') out.name = String(next());
+    else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--force-public-gateway') out.forcePublicGateway = true;
     else if (a === '--rate-limit') out.rateLimit = Number(next());
     else if (a === '--allow-host') { (out.allowHosts = out.allowHosts || []).push(String(next())); }
@@ -86,6 +88,7 @@ function printHelp() {
   console.log('  --gateway, -g <端口>     本地密码门端口（默认 18080，只监听 127.0.0.1）');
   console.log('  --host <地址>            密码门监听地址（仅允许回环，默认 127.0.0.1）');
   console.log('  --app / --browser        启动时用桌面窗口（默认）还是普通浏览器打开配置页');
+  console.log('  --dry-run                只生成配置并打印 cloudflared 命令，不真的起隧道（排障用）');
   console.log('  --cloudflared <路径>     指定 cloudflared.exe（默认用同目录下的）');
   console.log('  --no-download            缺 cloudflared.exe 时不自动下载');
   console.log('  --rate-limit <次数>      每客户端 IP 每分钟请求上限（默认 3000）');
@@ -226,6 +229,9 @@ function applyProfile(args) {
   if (p.passwordMode === 'fixed' && p.password) args.password = String(p.password);
   if (p.openBrowser) args.open = true;
   if (p.noTunnel) args.noTunnel = true;
+  args.tunnelMode = String(p.mode || 'quick');
+  args.hostname = String(p.hostname || '');
+  args.tunnelName = String(p.tunnelName || p.id || '');
   args.name = p.name;
   return p;
 }
@@ -240,7 +246,11 @@ async function main() {
     console.error('拒绝启动：--host ' + args.host + ' 会让同网段的人绕过隧道直连网关（不走密码门）。确实需要请加 --force-public-gateway');
     process.exit(2);
   }
-  const ttlMs = parseTtl(args.ttl);
+  const NAMED = require('./lib/named.js');
+  const ttlRaw = String(args.ttl || '').trim().toLowerCase();
+  const forever = (ttlRaw === 'forever' || ttlRaw === '0' || ttlRaw === 'inf' || ttlRaw === 'never');
+  const ttlMs = forever ? 0 : parseTtl(args.ttl);
+  const isNamedMode = String(args.tunnelMode || '') === 'named';
   const password = args.password || process.env.TUNNEL_PASSWORD || randomPassword();
   const generated = !args.password && !process.env.TUNNEL_PASSWORD;
   const SECRET = crypto.randomBytes(32);
@@ -252,7 +262,8 @@ async function main() {
   logStream = fs.createWriteStream(logFile, { flags: 'a' });
   writeState({ id: args.runProfile || '', name: args.name || '', pid: process.pid, port: args.port,
     gateway: args.gateway, ttl: args.ttl, host: args.host, password: password, running: true,
-    phase: 'starting', startedAt: Date.now(), logFile: logFile, exitReason: '', error: '' });
+    phase: 'starting', startedAt: Date.now(), logFile: logFile, exitReason: '', error: '',
+    mode: isNamedMode ? 'named' : 'quick', hostname: args.hostname || '', forever: forever });
 
   // 密码校验：恒定时间比较
   const pwdDigest = crypto.createHash('sha256').update(password).digest();
@@ -552,6 +563,37 @@ async function main() {
   }
   let child = null;
   const exe = args.noTunnel ? null : await ensureCloudflared(args);
+  // 命名隧道：把 cloudflared 配置写好，指向本地密码门（这样自有域名也必须先过密码）
+  let namedCtx = null;
+  if (!args.noTunnel && isNamedMode) {
+    const stateDir = args.stateFile ? path.dirname(args.stateFile) : path.join(HERE, 'state');
+    const profile = { id: args.runProfile || 'manual', mode: 'named', hostname: args.hostname, tunnelName: args.tunnelName || args.runProfile || 'manual' };
+    const rd = NAMED.namedReadiness(HERE, stateDir, profile, args.cloudflared);
+    if (!rd.ready) throw new Error('命名隧道还没准备好 —— ' + rd.steps.join('；'));
+    const yaml = NAMED.buildConfigYaml({ hostname: rd.hostname, gatewayPort: args.gateway, tunnelId: rd.tunnelId, credentialsFile: rd.credentialsFile });
+    fs.mkdirSync(path.dirname(rd.configFile), { recursive: true });
+    fs.writeFileSync(rd.configFile, yaml, 'utf8');
+    namedCtx = {
+      url: rd.publicUrl, configFile: rd.configFile, tunnelId: rd.tunnelId, hostname: rd.hostname,
+      args: NAMED.runArgs({ configFile: rd.configFile, tunnelId: rd.tunnelId }),
+    };
+    log('命名隧道已就绪: ' + namedCtx.url + '  ->  http://127.0.0.1:' + args.gateway);
+  }
+  // --dry-run：只生成配置并打印命令，不真的起隧道（排障 + 自动化测试用）
+  if (args.dryRun) {
+    const cmdLine = namedCtx
+      ? (exe + ' ' + namedCtx.args.join(' '))
+      : (exe + ' tunnel --no-autoupdate --url http://127.0.0.1:' + args.gateway);
+    console.log('cloudflared : ' + (exe || '(未使用)'));
+    console.log('命令        : ' + cmdLine);
+    if (namedCtx) console.log('配置文件    : ' + namedCtx.configFile);
+    writeState({ running: false, phase: 'dry-run', mode: isNamedMode ? 'named' : 'quick',
+      hostname: args.hostname || '', url: namedCtx ? namedCtx.url : '', expiresAt: 0,
+      cloudflaredCommand: cmdLine, configFile: namedCtx ? namedCtx.configFile : '' });
+    args.dryRunKeepState = true;
+    try { server.close(); } catch (e) {}
+    process.exit(0);
+  }
   if (!args.noTunnel) log('启动 Cloudflare 快速隧道...');
   // 每个实例按网关端口写各自的两个 pid 文件（node 与 cloudflared），
   // 这样 stop.cmd 能精确关闭某一个实例，不会误杀别人的隧道
@@ -559,7 +601,7 @@ async function main() {
   const CF_PID_FILE = path.join(HERE, '.tunnel-' + args.gateway + '.cloudflared.pid');
   if (!args.noTunnel) {
     reapStale();
-    child = spawn(exe, ['tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:' + args.gateway], {
+    child = spawn(exe, namedCtx ? namedCtx.args : ['tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:' + args.gateway], {
       cwd: HERE, windowsHide: true,
     });
     try {
@@ -583,7 +625,8 @@ async function main() {
     setTimeout(() => resolve(null), 60_000);
   });
 
-  let url = await urlSeen;
+  // 命名隧道的地址是固定的自有域名，不用等 cloudflared 打印
+  let url = namedCtx ? namedCtx.url : await urlSeen;
   if (args.noTunnel) url = 'http://' + (args.host === '0.0.0.0' ? '127.0.0.1' : args.host) + ':' + args.gateway;
   if (!url) {
     log('未能取得公网地址，请检查网络/cloudflared 输出；日志: ' + logFile);
@@ -593,20 +636,25 @@ async function main() {
     process.exit(1);
   }
 
-  expiresAt = Date.now() + ttlMs;
-  const hhmm = new Date(expiresAt).toLocaleString('zh-CN', { hour12: false });
+  expiresAt = forever ? 0 : Date.now() + ttlMs;
+  const hhmm = forever ? '不自动关闭' : new Date(expiresAt).toLocaleString('zh-CN', { hour12: false });
   const bar = '='.repeat(64);
   console.log('\n' + bar);
   console.log((args.noTunnel ? '  本地地址     : ' : '  临时公网地址 : ') + url);
   console.log('  访问密码     : ' + password + (generated ? '   （自动生成）' : ''));
   console.log('  映射到本机   : 127.0.0.1:' + args.port + '   （网关 ' + args.host + ':' + args.gateway + '）');
-  console.log('  自动关闭时间 : ' + hhmm + '   （TTL ' + Math.round(ttlMs / 60000) + ' 分钟，从地址就绪起算）');
+  console.log('  自动关闭时间 : ' + hhmm + (forever
+    ? '   （TTL=forever：地址长期有效，关掉程序才停止）'
+    : '   （TTL ' + Math.round(ttlMs / 60000) + ' 分钟，从地址就绪起算）'));
+  if (isNamedMode) console.log('  隧道类型     : 命名隧道（自有域名，地址永久固定）');
   console.log('  日志文件     : ' + logFile);
   console.log('  关闭方式     : 到点自动关闭 / 本窗口 Ctrl+C / 双击 stop.cmd');
   console.log(bar + '\n');
   log('公网地址已就绪: ' + url);
   writeState({ running: true, phase: 'running', url: url, cloudflaredPid: (child && child.pid) ? child.pid : 0,
-    expiresAt: expiresAt, startedAt: Date.now(), password: password, port: args.port, gateway: args.gateway });
+    expiresAt: expiresAt, startedAt: Date.now(), password: password, port: args.port, gateway: args.gateway,
+    mode: isNamedMode ? 'named' : 'quick', hostname: args.hostname || '',
+    tunnelId: namedCtx ? namedCtx.tunnelId : '', configFile: namedCtx ? namedCtx.configFile : '' });
 
   let closed = false;
   // Windows 下直接 kill 只杀到 cmd/node 这一层，cloudflared 可能变成孤儿把隧道继续开着；
@@ -629,20 +677,23 @@ async function main() {
     if (closed) return;
     closed = true;
     log('关闭中（' + reason + '）...');
-    writeState({ running: false, phase: 'stopped', url: '', exitReason: String(reason || ''), stoppedAt: Date.now() });
+    if (!args.dryRunKeepState) writeState({ running: false, phase: 'stopped', url: '', exitReason: String(reason || ''), stoppedAt: Date.now() });
     killTunnelTree();
     try { server.close(); } catch {}
     if (logStream) logStream.end();
     setTimeout(() => process.exit(0), 400);
   }
-  const timer = setTimeout(() => shutdown('到达 TTL ' + Math.round(ttlMs / 60000) + ' 分钟'), ttlMs);
+  const timer = forever ? null : setTimeout(() => shutdown('到达 TTL ' + Math.round(ttlMs / 60000) + ' 分钟'), ttlMs);
   const hb = setInterval(() => {
     const left = expiresAt ? Math.max(0, Math.round((expiresAt - Date.now()) / 60000)) : 0;
     log('剩余约 ' + left + ' 分钟');
   }, 5 * 60 * 1000);
-  process.on('exit', () => { writeState({ running: false, url: '', exitReason: '进程退出' }); killTunnelTree(); });
-  process.on('SIGINT', () => { clearTimeout(timer); clearInterval(hb); shutdown('Ctrl+C'); });
-  process.on('SIGTERM', () => { clearTimeout(timer); clearInterval(hb); shutdown('SIGTERM'); });
+  process.on('exit', () => {
+    if (!args.dryRunKeepState) writeState({ running: false, url: '', exitReason: '进程退出' });
+    killTunnelTree();
+  });
+  process.on('SIGINT', () => { if (timer) clearTimeout(timer); clearInterval(hb); shutdown('Ctrl+C'); });
+  process.on('SIGTERM', () => { if (timer) clearTimeout(timer); clearInterval(hb); shutdown('SIGTERM'); });
   if (child) child.on('exit', () => { if (!closed) shutdown('cloudflared 退出'); });
   if (args.open && url) {
     try { require('node:child_process').spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore', windowsHide: true }).unref(); } catch {}
@@ -652,7 +703,7 @@ async function main() {
 // 子命令走 lib/cli.js（GUI / 托盘 / MCP / 多通道管理）；以 - 开头的老参数仍然是"前台单通道"模式
 const SUBCOMMANDS = ['gui', 'tray', 'mcp', 'list', 'status', 'start', 'stop', 'enable', 'disable',
   'autostart-on', 'autostart-off', 'regen', 'add', 'rm', 'remove', 'delete', 'config', 'api', 'daemon', 'help',
-  'update', 'version', 'app'];
+  'update', 'version', 'app', 'login', 'domain', 'info'];
 const ARGV = process.argv.slice(2);
 if (ARGV.length && !ARGV[0].startsWith('-') && SUBCOMMANDS.includes(ARGV[0])) {
   require('./lib/cli.js').run(ARGV[0], ARGV.slice(1))

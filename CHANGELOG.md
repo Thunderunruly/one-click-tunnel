@@ -1,5 +1,19 @@
 # 更新日志 Changelog
 
+---
+
+# 1.4.0：自有域名（命名隧道，地址永久固定）
+
+- 新增 **命名隧道**：`tunnel login` 浏览器授权一次，`tunnel domain <id> app.example.com` 自动建隧道 +
+  加 DNS 记录 + 写回配置，地址永久固定（不再是每次随机的 trycloudflare 地址）
+- TTL 支持 `forever`：命名隧道默认不自动关闭，域名长期有效
+- 公网域名背后仍然是**本机密码门**：生成的 cloudflared 配置把 ingress 指向 127.0.0.1:<网关>，业务端口不直接暴露
+- 新增 `tunnel info [id]`（类型/域名/隧道ID/凭据/还差什么）与 `--dry-run`（只生成配置并打印命令）
+- 配置页：Cloudflare 登录按钮 + 每条通道可切 快速/命名 并绑定域名；MCP 新增
+  `cloudflare_login` / `set_custom_domain` / `cloudflare_status`
+- 测试：`node test-named.mjs` 30 项（离线：纯函数 + dry-run 集成 + 各类异常）
+
+
 每个版本的用户可见变化。发布说明（含下载与校验方式）见 https://github.com/Thunderunruly/one-click-tunnel/releases
 
 Release notes are written in Chinese; per-release notes (download + SHA-256 verification) live on the Releases page.

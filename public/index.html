@@ -89,6 +89,10 @@
       <div class="field"><label>MCP（AI 集成）</label>
         <label class="row tight"><input type="checkbox" id="setMcp"> 允许 AI 通过 MCP 管理通道</label>
       </div>
+      <div class="field"><label>Cloudflare 登录（自有域名必选）</label>
+        <div class="row tight"><span class="muted" id="cfStatus">读取中...</span><button data-act="cfLogin">登录 Cloudflare</button></div>
+        <span class="muted">用自己的域名（如 app.example.com）需要：域名托管在 Cloudflare + 浏览器授权一次</span>
+      </div>
       <div class="field"><label>托盘</label>
         <label class="row tight"><input type="checkbox" id="setTray"> 启动时最小化到托盘</label>
         <span class="muted">图标在任务栏右下角；Win11 默认收进 ^ 溢出区，可拖出来固定显示。托盘由后台进程提供，不在这个网页里</span>
@@ -120,6 +124,10 @@
       <div class="field"><label>密码</label>
         <select id="addPwMode"><option value="random">随机生成</option><option value="fixed">手动设置</option></select>
       </div>
+      <div class="field"><label>隧道类型</label>
+        <select id="addMode"><option value="quick">快速隧道（地址随机，1 次一换）</option><option value="named">命名隧道（自有域名，地址永久固定）</option></select>
+      </div>
+      <div class="field"><label>自有域名（命名隧道用）</label><input id="addHostname" class="mono" placeholder="app.example.com"></div>
       <div class="field"><label>手动密码</label><input id="addPassword" placeholder="选‘手动设置’时填写"></div>
       <div class="field"><label>&nbsp;</label><label class="row tight"><input type="checkbox" id="addAuto"> 随守护进程自动启动</label></div>
       <div class="field"><label>&nbsp;</label><label class="row tight"><input type="checkbox" id="addNoTunnel"> 只起本地密码门（不建隧道，排障用）</label></div>
@@ -204,6 +212,12 @@
       h += '<div class="row" style="margin-top:6px"><span class="muted">公网地址</span><span class="url mono">' + esc(s.url) + '</span>';
       h += '<button data-act="copy" data-copy="' + esc(s.url) + '">复制</button></div>';
     }
+    h += '<div class="row tight" style="margin-top:6px"><span class="muted">隧道类型</span><span class="mono">' + (s.mode === 'named' ? '命名隧道（自有域名，地址固定）' : '快速隧道（随机地址）') + '</span>';
+    if (s.mode === 'named') {
+      h += '<span class="muted">域名</span><span class="mono">' + esc(s.hostname || '(未填)') + '</span>';
+      if (s.tunnelId) h += '<span class="muted">隧道ID</span><span class="mono">' + esc(String(s.tunnelId).slice(0, 8)) + '...</span>';
+    }
+    h += '</div>';
     h += '<div class="row" style="margin-top:6px"><span class="muted">访问密码</span>';
     h += '<span class="mono pw" data-pw="' + esc(s.id) + '" data-hidden="1">••••••••</span>';
     h += '<button data-act="togglePw" data-id="' + esc(s.id) + '">显示</button>';
@@ -216,6 +230,9 @@
     h += '<select data-edit="pwmode" data-id="' + esc(s.id) + '"><option value="random"' + (s.passwordMode !== 'fixed' ? ' selected' : '') + '>每次随机</option><option value="fixed"' + (s.passwordMode === 'fixed' ? ' selected' : '') + '>手动固定</option></select>';
     h += '<input data-edit="password" data-id="' + esc(s.id) + '" class="mono" placeholder="手动密码" value="' + esc(s.passwordMode === 'fixed' ? s.password : '') + '">';
     h += '<button class="primary" data-act="save" data-id="' + esc(s.id) + '">保存</button>';
+    h += '<select data-edit="mode" data-id="' + esc(s.id) + '"><option value="quick"' + (s.mode !== 'named' ? ' selected' : '') + '>快速隧道</option><option value="named"' + (s.mode === 'named' ? ' selected' : '') + '>命名隧道(自有域名)</option></select>';
+    h += '<input data-edit="hostname" data-id="' + esc(s.id) + '" class="mono" placeholder="app.example.com" value="' + esc(s.hostname || '') + '">';
+    h += '<button data-act="setupDomain" data-id="' + esc(s.id) + '">建隧道并绑定域名</button>';
     h += '<button data-act="regen" data-id="' + esc(s.id) + '">换随机密码</button>';
     h += '<button class="ghost" data-act="log" data-id="' + esc(s.id) + '">日志</button>';
     h += '</div>';
@@ -264,6 +281,10 @@
     else if (up.hasUpdate) st += ' · 有新版 ' + up.latestVersion;
     else if (up.latestVersion) st += ' · 已是最新 (' + up.latestVersion + ')';
     document.getElementById('updateStatus').textContent = st;
+    var cfinfo = state.cloudflare || {};
+    document.getElementById('cfStatus').textContent = (cfinfo.loggedIn ? '已登录' : '未登录')
+      + ' · cloudflared ' + (cfinfo.cloudflared ? '就绪' : '未就绪')
+      + (cfinfo.namedCount ? (' · 命名隧道 ' + cfinfo.namedCount + ' 条') : '');
     var bar = document.getElementById('updateBar');
     if (up.hasUpdate) {
       bar.style.display = '';
@@ -314,7 +335,9 @@
       var ttl = document.querySelector('[data-edit="ttl"][data-id="' + id + '"]').value;
       var mode = document.querySelector('[data-edit="pwmode"][data-id="' + id + '"]').value;
       var pwd = document.querySelector('[data-edit="password"][data-id="' + id + '"]').value;
-      var patch = { ttl: ttl, passwordMode: mode };
+      var tmode = document.querySelector('[data-edit="mode"][data-id="' + id + '"]').value;
+      var host = document.querySelector('[data-edit="hostname"][data-id="' + id + '"]').value;
+      var patch = { ttl: ttl, passwordMode: mode, mode: tmode, hostname: host };
       if (mode === 'fixed') patch.password = pwd;
       return done(api('/api/profile', { id: id, patch: patch }).then(function () { toast('已保存（重新启动后生效）'); }));
     }
@@ -328,6 +351,18 @@
       return done(api('/api/action', { action: action, id: id }));
     }
     if (act === 'regen') return done(api('/api/action', { action: 'regenPassword', id: id }));
+    if (act === 'setupDomain') {
+      var hostInput = document.querySelector('[data-edit="hostname"][data-id="' + id + '"]');
+      var host = hostInput ? hostInput.value.trim() : '';
+      if (!host) { toast('请先填自有域名，例如 app.example.com', true); return; }
+      el.disabled = true;
+      return api('/api/cloudflare', { action: 'setup', id: id, hostname: host }).then(function (r) {
+        toast('已绑定: ' + (r.publicUrl || host));
+        return refresh();
+      }).catch(function (e) {
+        toast(e.message + (/登录/.test(e.message) ? '（先点上面的「登录 Cloudflare」）' : ''), true);
+      }).then(function () { el.disabled = false; });
+    }
     if (act === 'start' || act === 'stop') {
       el.disabled = true;
       return done(api('/api/action', { action: act, id: id }));
@@ -360,6 +395,15 @@
     if (!el) return;
     var act = el.getAttribute('data-act');
     var p;
+    if (act === 'cfLogin') {
+      el.disabled = true;
+      toast('浏览器里完成授权（选择你的域名）…最长等 5 分钟');
+      p = api('/api/cloudflare', { action: 'login' });
+      p.then(function (r) { return refresh().then(function () { toast('已登录 Cloudflare'); }); })
+        .catch(function (e) { toast(e.message, true); })
+        .then(function () { el.disabled = false; });
+      return;
+    }
     if (act === 'startAll') p = api('/api/action', { action: 'startAll' });
     else if (act === 'stopAll') p = api('/api/action', { action: 'stopAll' });
     else if (act === 'saveSettings') p = api('/api/settings', {
@@ -383,7 +427,9 @@
         passwordMode: document.getElementById('addPwMode').value,
         password: document.getElementById('addPassword').value,
         autoStart: document.getElementById('addAuto').checked,
-        noTunnel: document.getElementById('addNoTunnel').checked
+        noTunnel: document.getElementById('addNoTunnel').checked,
+        mode: document.getElementById('addMode').value,
+        hostname: document.getElementById('addHostname').value.trim()
       };
       Object.keys(profile).forEach(function (k) { if (profile[k] === undefined) delete profile[k]; });
       p = api('/api/profile', { profile: profile });

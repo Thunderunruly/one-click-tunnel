@@ -51,6 +51,36 @@ The classic single-tunnel flags still work exactly as before:
 
     public-tunnel.exe --port 3000 --ttl 1h --password mypassword
 
+## Permanent address with your own domain (named tunnels)
+
+Quick tunnels give you a random `*.trycloudflare.com` address that changes on every run. If you own a domain
+managed by Cloudflare, you can give a tunnel a **permanent** address instead:
+
+    public-tunnel.exe login                        # one browser authorization (pick the domain/zone)
+    public-tunnel.exe domain web app.example.com   # creates the named tunnel + the DNS record
+    public-tunnel.exe start web                    # now serving https://app.example.com, permanently
+
+- `tunnel login` stores the origin certificate in `state/cloudflare/cert.pem` (once per account).
+- `tunnel domain <id> <hostname>` creates the tunnel, copies its credentials into `state/cloudflare/` and
+  points the hostname at it. It also writes `mode: named` and `ttl: forever` into the config, so the address
+  never expires.
+- The tunnel still terminates at the **password gate on 127.0.0.1**, so a permanent hostname is not an open door.
+- `tunnel info [id]` shows mode, hostname, tunnel id and anything still missing.
+- `--dry-run` prints the generated cloudflared config and command without starting anything.
+- Config page: a Cloudflare login button, plus a per-tunnel quick/named switch and domain binding.
+- AI hosts get the same through the MCP tools `cloudflare_login`, `set_custom_domain` and `cloudflare_status`.
+- Requirements: the domain's DNS must be managed by Cloudflare (the free plan is enough).
+
+Generated `state/cloudflare/<id>.cloudflared.yml`:
+
+    tunnel: <tunnel-id>
+    credentials-file: '<...>/<id>.credentials.json'
+    no-autoupdate: true
+    ingress:
+      - hostname: app.example.com
+        service: http://127.0.0.1:18080      # <- the local password gate, not your app port
+      - service: http_status:404
+
 ## Where is the tray icon?
 
 The tray is **not** part of the web page - a browser page cannot own a notification-area icon. The background
