@@ -15,6 +15,13 @@ const REG_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\
 
 let passCount = 0;
 const failures = [];
+// CI 里 dist/ 是不存在的，先自己构建一次；没有 cloudflared.exe 时相关检查自动跳过
+if (!fs.existsSync(path.join(DIST, 'public-tunnel.exe'))) {
+  console.log('dist/public-tunnel.exe 不存在，先运行 build/make-exe.mjs 构建...');
+  const b = spawnSync(process.execPath, [path.join(ROOT, 'build', 'make-exe.mjs')], { cwd: ROOT, stdio: 'inherit', windowsHide: true });
+  if (b.status !== 0) { console.error('构建失败，退出码 ' + b.status); process.exit(1); }
+}
+const HAS_CLOUDFLARED = fs.existsSync(path.join(DIST, 'cloudflared.exe'));
 function ok(name, cond, detail) {
   if (cond) { passCount += 1; console.log('  PASS  ' + name); }
   else { failures.push(name); console.log('  FAIL  ' + name + (detail === undefined ? '' : '   [' + String(detail) + ']')); }
@@ -51,6 +58,7 @@ async function main() {
   ok('I1 安装脚本执行成功', inst.indexOf('安装完成') >= 0, inst.slice(-300));
 
   for (const f of ['public-tunnel.exe', 'cloudflared.exe', 'start.cmd', 'stop.cmd', 'uninstall.cmd', 'uninstall.ps1', 'README.md']) {
+    if (f === 'cloudflared.exe' && !HAS_CLOUDFLARED) { ok('I2 已安装 ' + f + '（dist 里没有该文件，跳过）', true); continue; }
     ok('I2 已安装 ' + f, fs.existsSync(path.join(INSTALL, f)));
   }
   const lnk = path.join(SHORTCUTS, '临时公网映射.lnk');
@@ -64,6 +72,14 @@ async function main() {
   ok('I4 注册表卸载项已写入（含中文名称）', rq.code === 0 && rqUtf8.indexOf('临时公网映射') >= 0, rq.code + ' / ' + rqUtf8);
 
   const exe = path.join(INSTALL, 'public-tunnel.exe');
+  if (!HAS_CLOUDFLARED) {
+    ok('I5/I6 真隧道相关检查（dist 里没有 cloudflared.exe，跳过）', true);
+    const unin0 = ps('& "' + path.join(INSTALL, 'uninstall.ps1') + '" -InstallDir "' + INSTALL + '" -Quiet');
+    ok('I8 卸载脚本执行成功', unin0.indexOf('卸载完成') >= 0 || !fs.existsSync(INSTALL), unin0.slice(-160));
+    ok('I9 安装目录已删除', !fs.existsSync(INSTALL));
+    ok('I10 注册表项已删除', regQuery().code !== 0);
+    return;
+  }
   const child = spawn(exe, ['--port', '19905', '--gateway', '18305', '--password', 'inst-pw', '--ttl', '50s'], { cwd: INSTALL, windowsHide: true });
   let spawnErr = null;
   child.on('error', (e) => { spawnErr = e.code || e.message; });

@@ -52,5 +52,14 @@ jobs:
       - name: Update checker tests (31)
         run: node test-update.mjs
 
+      - name: Download cloudflared (needed by the installer test)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe' -OutFile cloudflared.exe -UseBasicParsing
+          if ((Get-Item cloudflared.exe).Length -lt 5MB) { throw 'cloudflared download incomplete' }
+
+      - name: Build single-file exe (needed by the installer test)
+        run: node build/make-exe.mjs
+
       - name: Bundled installer test (18)
         run: node build/test-installer.mjs
