@@ -24,7 +24,7 @@ jobs:
           - os: ubuntu-22.04
             target: linux
             artifact: oct-shell-linux-x64
-    runs-on: ${matrix.os}}
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: app/flutter
@@ -54,7 +54,7 @@ jobs:
 
       - name: Build
         shell: bash
-        run: flutter build ${matrix.target}} --release
+        run: flutter build ${{ matrix.target }} --release
 
       - name: Package (windows)
         if: matrix.target == 'windows'
@@ -62,7 +62,7 @@ jobs:
         run: |
           mkdir -p out
           cp -r build/windows/x64/runner/Release/. out/
-          cd out && 7z a -tzip ../${matrix.artifact}}.zip . > /dev/null
+          cd out && 7z a -tzip ../${{ matrix.artifact }}.zip . > /dev/null
 
       - name: Package (macos)
         if: matrix.target == 'macos'
@@ -70,7 +70,7 @@ jobs:
         run: |
           mkdir -p out
           cp -r build/macos/Build/Products/Release/*.app out/
-          cd out && zip -qry ../${matrix.artifact}}.zip .
+          cd out && zip -qry ../${{ matrix.artifact }}.zip .
 
       - name: Package (linux)
         if: matrix.target == 'linux'
@@ -78,12 +78,12 @@ jobs:
         run: |
           mkdir -p out
           cp -r build/linux/x64/release/bundle/. out/
-          cd out && zip -qry ../${matrix.artifact}}.zip .
+          cd out && zip -qry ../${{ matrix.artifact }}.zip .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${matrix.artifact}}
-          path: app/flutter/${matrix.artifact}}.zip
+          name: ${{ matrix.artifact }}
+          path: app/flutter/${{ matrix.artifact }}.zip
           if-no-files-found: error
 
   publish:
@@ -102,7 +102,7 @@ jobs:
           cat SHA256SUMS
       - name: Publish to prerelease
         env:
-          GH_TOKEN: ${secrets.GITHUB_TOKEN}}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -x
           cd dist
