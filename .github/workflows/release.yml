@@ -62,23 +62,26 @@ jobs:
       - name: Test packaged exe (CLI / GUI / self-spawn)
         run: node test-exe.mjs
 
-      - name: Checksums
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force release | Out-Null
-          $lines = @()
-          foreach ($f in @('dist/public-tunnel.exe','dist/cloudflared.exe')) {
-            $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
-            $lines += ($h + '  ' + (Split-Path $f -Leaf))
-          }
-          $lines | Set-Content release/SHA256SUMS.txt -Encoding ascii
-          Get-Content release/SHA256SUMS.txt
-
       - name: Build portable zip (double-click install.cmd)
         run: node build/make-zip.mjs
 
       - name: Build Inno Setup installer (if ISCC is available on the runner)
         run: node build/make-setup.mjs
+
+      - name: Checksums (covers every published artifact, so the built-in updater can verify downloads)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          $lines = @()
+          $targets = @('dist/public-tunnel.exe','dist/cloudflared.exe')
+          $targets += @(Get-ChildItem release/*.zip, release/*setup*.exe -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          foreach ($f in $targets) {
+            $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+            $lines += ($h + '  ' + (Split-Path $f -Leaf))
+          }
+          $lines | Set-Content release/SHA256SUMS.txt -Encoding ascii
+          Get-Content release/SHA256SUMS.txt
+          if ((Get-Content release/SHA256SUMS.txt).Count -lt 3) { throw 'SHA256SUMS.txt 内容过少' }
 
       - name: Silent install / uninstall check
         if: hashFiles('release/*setup*.exe') != ''
