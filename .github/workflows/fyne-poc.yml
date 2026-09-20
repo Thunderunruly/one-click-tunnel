@@ -104,7 +104,7 @@ jobs:
         run: ls -lR dist-poc
       - name: Publish to the poc-fyne pre-release
         env:
-          GH_TOKEN: ${ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -x
           gh --version
