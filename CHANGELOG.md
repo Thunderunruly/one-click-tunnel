@@ -2,6 +2,16 @@
 
 ---
 
+# 1.5.1：修掉开机自启启动器（launch.vbs）解析失败
+
+- 现象：双击桌面/开始菜单快捷方式弹出 "Windows Script Host ... 无效字符 800A0408"
+- 原因：launch.vbs / stop-all.vbs 是 UTF-8（无 BOM）+ LF 换行 + 中文注释，WSH 按 ANSI 解析直接报错
+- 修复：两个 .vbs 改成 WSH 原生支持的 UTF-16LE + BOM + CRLF，并用 cscript 实测解析通过
+- 另：.gitattributes 里把 *.vbs 标记为 binary，避免 git 再次改行尾/编码
+- 已经装了 1.5.0 的：直接在安装目录里跑 start.cmd 也能用；或重新安装 1.5.1 覆盖
+
+---
+
 # 1.5.0：四件高级功能
 
 1. 配置页实时输出：Cloudflare 登录 / 建隧道绑域名 改成后台任务，页面显示 cloudflared 的实时输出（不再干等）

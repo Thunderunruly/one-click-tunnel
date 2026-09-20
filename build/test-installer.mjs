@@ -69,7 +69,10 @@ async function main() {
     ok('I3 快捷方式已创建', fs.existsSync(lnk), lnk);
     if (fs.existsSync(lnk)) {
       const target = ps('(New-Object -ComObject WScript.Shell).CreateShortcut("' + lnk + '").TargetPath');
-      ok('I3b 快捷方式指向安装目录的 start.cmd', target.toLowerCase() === path.join(INSTALL, 'start.cmd').toLowerCase(), target);
+      const argsOf = ps('(New-Object -ComObject WScript.Shell).CreateShortcut("' + lnk + '").Arguments');
+      const isWscript = /wscript\.exe$/i.test(target);
+      const pointsToLauncher = /launch\.vbs/i.test(argsOf) || /start\.cmd$/i.test(target);
+      ok('I3b 快捷方式走无控制台启动器（wscript + launch.vbs）', isWscript && pointsToLauncher, target + ' ' + argsOf);
     }
   }
   const rq = regQuery();
