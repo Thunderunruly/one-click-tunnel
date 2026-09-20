@@ -32,7 +32,7 @@ jobs:
             node --check $_.FullName
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
-          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-update.mjs','test-named.mjs','test-upstream.mjs','test-exe.mjs','test-launcher.mjs','test-tray.mjs','build/test-installer.mjs')) {
+          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-update.mjs','test-named.mjs','test-upstream.mjs','test-port-isolation.mjs','test-exe.mjs','test-launcher.mjs','test-tray.mjs','build/test-installer.mjs')) {
             node --check $f
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
@@ -57,6 +57,9 @@ jobs:
 
       - name: Upstream target tests (20: localhost / LAN device / open-proxy guard)
         run: node test-upstream.mjs
+
+      - name: Port isolation tests (11: a tunnel can only ever reach its own port)
+        run: node test-port-isolation.mjs
 
       - name: Download cloudflared (needed by the installer test)
         shell: pwsh

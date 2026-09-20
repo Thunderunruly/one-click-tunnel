@@ -54,7 +54,7 @@ function parseArgs(argv) {
     upstreamHost: '', cloudflared: '', noDownload: false, noTunnel: false, open: false, forcePublicGateway: false, rateLimit: 3000, allowHosts: [],
     runProfile: '', config: '', stateFile: '', name: '',
     tunnelMode: '', hostname: '', hostnames: [], tunnelName: '', dryRun: false,
-    target: '', allowPublicTarget: false, targetSecure: false, targetInsecureTLS: false };
+    target: '', allowPublicTarget: false, targetSecure: false, targetInsecureTLS: false, fixedHost: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -75,6 +75,7 @@ function parseArgs(argv) {
     else if (a === '--allow-public-target') out.allowPublicTarget = true;
     else if (a === '--target-secure') out.targetSecure = true;
     else if (a === '--target-insecure-tls') out.targetInsecureTLS = true;
+    else if (a === '--fixed-host') out.fixedHost = true;
     else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--force-public-gateway') out.forcePublicGateway = true;
     else if (a === '--rate-limit') out.rateLimit = Number(next());
@@ -92,6 +93,7 @@ function printHelp() {
   console.log('  --allow-public-target    允许目标是公网地址（默认拒绝，避免变成开放代理）');
   console.log('  --target-secure          用 https 连接上游（局域网设备带证书时）');
   console.log('  --target-insecure-tls    连接上游时跳过证书校验（自签证书，慎用）');
+  console.log('  --fixed-host             一律把 Host 改写成本机目标地址（最严，不吃任何 Host 透传）');
   console.log('  --ttl, -t <时长>         存活时长，如 30m / 2h / 1d（默认 1h，从公网地址就绪起算）');
   console.log('  --password, -P <密码>    访问密码（默认随机生成，也可用环境变量 TUNNEL_PASSWORD）');
   console.log('  --gateway, -g <端口>     本地密码门端口（默认 18080，只监听 127.0.0.1）');
@@ -243,6 +245,7 @@ function applyProfile(args) {
   if (p.noTunnel) args.noTunnel = true;
   if (p.target) args.target = String(p.target);
   if (p.allowPublicTarget) args.allowPublicTarget = true;
+  if (p.fixedHost) args.fixedHost = true;
   args.tunnelMode = String(p.mode || 'quick');
   args.hostname = String(p.hostname || '');
   args.tunnelName = String(p.tunnelName || p.id || '');
@@ -393,13 +396,21 @@ async function main() {
     return args.upstreamHost || (up ? up.hostHeader : '127.0.0.1:' + args.port);
   }
   function hostAllowed(hostHeader) {
-    const host = String(hostHeader || '').replace(/:\d+$/, '').toLowerCase();
-    if (!host) return false;
-    if (['localhost', '127.0.0.1', '::1'].includes(host)) return true;
-    if (host.endsWith('.trycloudflare.com')) return true;
+    if (args.fixedHost) return false;                       // --fixed-host：永远改写（最严）
+    const raw = String(hostHeader || '').trim().toLowerCase();
+    if (!raw) return false;
+    const bare = raw.replace(/:\d+$/, '');
+    // 只有"我们自己的网关地址"可以原样透传 —— 注意带端口，其它端口不算
+    const gateHosts = new Set([
+      'localhost:' + args.gateway, '127.0.0.1:' + args.gateway,
+      '::1:' + args.gateway, '[::1]:' + args.gateway,
+    ]);
+    if (gateHosts.has(raw)) return true;
+    if (bare.endsWith('.trycloudflare.com')) return true;   // 隧道域名（Vite 之类要求 Host 在白名单里）
+    if (args.hostname && bare === String(args.hostname).toLowerCase()) return true;  // 命名隧道的自有域名
     return (args.allowHosts || []).some((h) => {
       const a = String(h).toLowerCase();
-      return host === a || host.endsWith('.' + a);
+      return bare === a || bare.endsWith('.' + a);
     });
   }
   /** 转发前清洗：不给上游看到我的会话 Cookie / Basic 网关口令；Host 不在白名单则改写 */

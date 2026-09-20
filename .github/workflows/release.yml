@@ -50,7 +50,7 @@ jobs:
       - name: Regression tests (source, offline)
         shell: pwsh
         run: |
-          foreach ($t in @('security-test.mjs','test-multi.mjs','security-test-gui.mjs','test-mcp.mjs','test-update.mjs','test-named.mjs','test-upstream.mjs')) {
+          foreach ($t in @('security-test.mjs','test-multi.mjs','security-test-gui.mjs','test-mcp.mjs','test-update.mjs','test-named.mjs','test-upstream.mjs','test-port-isolation.mjs')) {
             Write-Host "== $t =="
             node $t
             if ($LASTEXITCODE -ne 0) { throw "$t failed" }

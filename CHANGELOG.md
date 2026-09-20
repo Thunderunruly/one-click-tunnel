@@ -2,6 +2,17 @@
 
 ---
 
+# 1.6.1：端口隔离验证 + Host 透传收紧
+
+- 新增 node test-port-isolation.mjs：证明"映射 3000 就绝不可能访问到 3001"
+  （绝对形式请求行、Host 头换端口、X-Forwarded-Host/Port、X-Original-URL/X-Rewrite-URL、
+  双斜杠与 @ 混淆路径、Proxy-Connection、路径里塞端口号、CONNECT、WebSocket 升级，共 12 种尝试）
+- 收紧 Host 透传：以前 Host 是 127.0.0.1 系的任意端口都会原样传给上游（TCP 目标没变，但上游若按 Host
+  转发就可能被借道）。现在只有「我们自己的网关地址 / 隧道域名 / 已配置的自有域名 / --allow-host 白名单」
+  才透传，其它一律改写成固定的上游地址；另加 --fixed-host 表示"永远改写"最严模式
+
+---
+
 # 1.6.0：统一命名 —— OCT（One Click Tunnel）
 
 - 项目名 = 仓库名 = `one-click-tunnel`；中文名统一成 **一键隧道**（不再叫"临时公网映射小工具"）
