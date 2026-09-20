@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const UP = require(path.join(HERE, 'lib', 'updater.js'));
 const { Config } = require(path.join(HERE, 'lib', 'config.js'));
+const PKG_VERSION = JSON.parse(fs.readFileSync(path.join(HERE, 'package.json'), 'utf8')).version;
 
 let passCount = 0;
 const failures = [];
@@ -83,7 +84,7 @@ async function main() {
   ok('U1 检测到新版本', r.ok && r.hasUpdate && r.latestVersion === '9.9.9', JSON.stringify({ ok: r.ok, has: r.hasUpdate, latest: r.latestVersion, err: r.error }));
   ok('U1b 带出更新说明与发布页', (r.notes || '').indexOf('更新说明') >= 0 && /releases\/tag/.test(r.htmlUrl || ''), (r.notes || '').slice(0, 40));
   ok('U1c 自动挑出 setup.exe 作为首选安装包', r.installer && r.installer.kind === 'setup' && /setup.*\.exe$/.test(r.installer.name), JSON.stringify(r.installer));
-  ok('U1d 当前版本取自 package.json/注入值', r.currentVersion === '1.1.0', r.currentVersion);
+  ok('U1d 当前版本取自 package.json/注入值', r.currentVersion === PKG_VERSION, r.currentVersion + ' vs ' + PKG_VERSION);
   ok('U1e 结果写入了 state/update.json 缓存', !!UP.readCache(tmp) && UP.readCache(tmp).latestVersion === '9.9.9');
 
   // 缓存：不强制不走网络
@@ -94,10 +95,10 @@ async function main() {
   ok('U3 force 会重新请求', hits.api === apiBefore + 1, 'hits=' + hits.api);
 
   // 已是最新 / 更旧
-  state.tag = 'v1.1.0';
+  state.tag = 'v' + PKG_VERSION;
   cfg = freshConfig();
   r = await UP.checkForUpdate(cfg, tmp, { force: true });
-  ok('U4 版本相同不算有更新', r.ok && !r.hasUpdate && r.latestVersion === '1.1.0', JSON.stringify({ has: r.hasUpdate, latest: r.latestVersion }));
+  ok('U4 版本相同不算有更新', r.ok && !r.hasUpdate && r.latestVersion === PKG_VERSION, JSON.stringify({ has: r.hasUpdate, latest: r.latestVersion }));
   state.tag = 'v1.0.0';
   cfg = freshConfig();
   r = await UP.checkForUpdate(cfg, tmp, { force: true });
