@@ -3,3 +3,6 @@ include: package:flutter_lints/flutter.yaml
 linter:
   rules:
     avoid_print: false
+    # 这个外壳刻意用字符串拼接（而不是插值）拼 URL/查询参数，避免误触发插值语法
+    prefer_interpolation_to_compose_strings: false
+    avoid_renaming_method_parameters: false

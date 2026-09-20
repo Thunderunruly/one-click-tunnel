@@ -45,6 +45,9 @@ jobs:
       - name: Version
         run: flutter --version
 
+      - name: Generate platform scaffolding (windows/macos/linux runners are generated, not committed)
+        run: flutter create --platforms=${{ matrix.target }} --project-name oct_shell --org com.oct .
+
       - name: Deps
         run: flutter pub get
 
