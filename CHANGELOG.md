@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+### 修复 —— 相对路径的 --config 会把守护进程的 state 写到别处
+- \`oct daemon start --config 相对路径/config.json\` 时，守护进程子进程是以 appDir 为 cwd 拉起的，
+  相对路径被它按自己的 cwd 解释，于是 state/daemon.json 写到了别的地方，父进程傻等 20 秒报"启动超时"。
+  现在 \`lib/cli.js\` 把 --config 解析成绝对路径，\`lib/daemonctl.js\` 拉起/查找守护进程时也按绝对路径走。
+  （这个 bug 是给三平台加"核心冒烟测试"时踩出来的：CI 里三个平台同时报同一个错。）
+
+
 ### 新增 —— macOS / Linux 也有核心了，三平台外壳包全部自带引擎
 - \`build/make-exe.mjs\` 改成跨平台：Windows 出 \`oct.exe\`，macOS / Linux 出 \`oct\`（macOS 上按 Node 官方流程先摘签名、
   注入 NODE_SEA_BLOB 时加 \`--macho-segment-name NODE_SEA\`、再 ad-hoc 重新签名；unix 产物 chmod 755）。
