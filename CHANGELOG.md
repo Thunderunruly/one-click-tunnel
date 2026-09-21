@@ -1,4 +1,17 @@
-## [1.6.2] - 2026-09-21
+## [Unreleased]
+
+### 新增 —— macOS / Linux 也有核心了，三平台外壳包全部自带引擎
+- \`build/make-exe.mjs\` 改成跨平台：Windows 出 \`oct.exe\`，macOS / Linux 出 \`oct\`（macOS 上按 Node 官方流程先摘签名、
+  注入 NODE_SEA_BLOB 时加 \`--macho-segment-name NODE_SEA\`、再 ad-hoc 重新签名；unix 产物 chmod 755）。
+  Windows 专有的安装脚本、GUI 启动器只在 Windows 上打包。
+- \`.github/workflows/flutter-shell.yml\` 不再下载 Windows 版发布包，而是**在三个平台各自现编核心**（和外壳同一 commit），
+  cloudflared 也按平台下载（windows-amd64 / darwin-arm64 / linux-amd64），然后一起塞进外壳 zip。
+- 每个平台额外产出只含引擎的压缩包：\`oct-core-windows-x64.zip\` / \`oct-core-macos-arm64.tar.gz\` / \`oct-core-linux-x64.tar.gz\`。
+- CI 里加了核心冒烟测试：\`oct version\` / \`oct help\` / \`oct daemon start\` → 请求 \`/api/health\` → \`oct list\` → \`oct daemon stop\`，
+  三个平台都真跑一遍，确保 unix 版的 SEA 产物不是"编出来但跑不起来"。
+- Flutter 外壳找核心/配置的目录改成"从可执行文件逐级往上找 4 层"，macOS 的 \`.app\`（核心在 .app 外面）才找得到；
+  另外补上 \`/usr/local/one-click-tunnel\`、\`/opt/one-click-tunnel\` 两个常见安装位置。
+
 
 ### 新增 —— 桌面外壳自带核心 + 裸跑不再乱开隧道 + 配置页看得见托盘
 - Flutter 外壳的 Windows 包在 CI 里自动把正式版核心（oct.exe / one-click-tunnel.exe / cloudflared.exe）一起装进 zip，

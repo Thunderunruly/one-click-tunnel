@@ -18,18 +18,28 @@ jobs:
           - os: windows-latest
             target: windows
             artifact: oct-shell-windows-x64
+            coreasset: oct-core-windows-x64.zip
+            cflurl: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
           - os: macos-latest
             target: macos
-            artifact: oct-shell-macos-universal
+            artifact: oct-shell-macos-arm64
+            coreasset: oct-core-macos-arm64.tar.gz
+            cflurl: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz
           - os: ubuntu-22.04
             target: linux
             artifact: oct-shell-linux-x64
+            coreasset: oct-core-linux-x64.tar.gz
+            cflurl: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: app/flutter
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Install Linux desktop deps
         if: matrix.target == 'linux'
@@ -45,7 +55,7 @@ jobs:
       - name: Version
         run: flutter --version
 
-      - name: Generate platform scaffolding (windows/macos/linux runners are generated, not committed)
+      - name: Generate platform scaffolding (runners are generated, not committed)
         shell: bash
         run: |
           flutter create --platforms=${{ matrix.target }} --project-name oct_shell --org com.oct .
@@ -58,9 +68,52 @@ jobs:
         continue-on-error: true
         run: flutter analyze
 
-      - name: Build
+      - name: Build shell
         shell: bash
         run: flutter build ${{ matrix.target }} --release
+
+      - name: Download cloudflared
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -e
+          curl -fsSL -o cf-download '${{ matrix.cflurl }}'
+          if [ '${{ matrix.target }}' = 'macos' ]; then
+            tar -xzf cf-download && rm -f cf-download && chmod +x cloudflared
+          elif [ '${{ matrix.target }}' = 'windows' ]; then
+            mv cf-download cloudflared.exe
+          else
+            mv cf-download cloudflared && chmod +x cloudflared
+          fi
+          ls -lh cloudflared*
+
+      - name: Build the core (Node SEA, same commit as the shell)
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          node --version
+          node build/make-exe.mjs
+          ls -lh dist
+
+      - name: Smoke-test the core binary (version / help / daemon / HTTP API)
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -e
+          BIN=dist/oct
+          if [ -f dist/oct.exe ]; then BIN=dist/oct.exe; fi
+          "$BIN" version
+          "$BIN" help | head -3
+          SMOKE=.smoke
+          rm -rf "$SMOKE"; mkdir -p "$SMOKE"
+          "$BIN" daemon start --config "$SMOKE/config.json"
+          sleep 3
+          PORT=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).port)" "$SMOKE/state/daemon.json")
+          echo "daemon port: $PORT"
+          curl -fsS "http://127.0.0.1:$PORT/api/health"; echo
+          "$BIN" list --config "$SMOKE/config.json" | head -6
+          "$BIN" daemon stop --config "$SMOKE/config.json"
+          rm -rf "$SMOKE"
 
       - name: Package (windows)
         if: matrix.target == 'windows'
@@ -75,7 +128,6 @@ jobs:
         run: |
           mkdir -p out
           cp -r build/macos/Build/Products/Release/*.app out/
-          cd out && zip -qry ../${{ matrix.artifact }}.zip .
 
       - name: Package (linux)
         if: matrix.target == 'linux'
@@ -83,42 +135,66 @@ jobs:
         run: |
           mkdir -p out
           cp -r build/linux/x64/release/bundle/. out/
-          cd out && zip -qry ../${{ matrix.artifact }}.zip .
 
-      - name: Bundle the core (windows only)
-        if: matrix.target == 'windows'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bundle the core into the shell package
+        working-directory: ${{ github.workspace }}
+        shell: bash
         run: |
-          gh release download --repo $env:GITHUB_REPOSITORY --pattern 'one-click-tunnel-*-win-x64.zip' --dir corezip
-          Get-ChildItem corezip | Format-Table Name, Length
-          Expand-Archive -Path (Get-ChildItem corezip/*.zip | Select-Object -First 1).FullName -DestinationPath core -Force
-          Copy-Item -Recurse -Force core/* out/
-          $note = @(
-            '这是 OCT（一键隧道）的 Flutter 桌面外壳预览版，核心已经打包在一起，不用另外下载。',
-            '',
-            '  双击 oct_shell.exe        -> 新界面（Flutter：纯 logo 启动页 / 通道列表 / 实时日志 / 托盘）',
-            '  双击 one-click-tunnel.exe -> 旧界面（浏览器窗口版；命令行参数都在 oct.exe 上）',
-            '',
-            '第一次打开时外壳会自动在后台起守护进程（oct.exe daemon start）。托盘图标在任务栏右下角，',
-            'Win11 默认收进 ^ 溢出区。点窗口右上角 × 会问你「最小化到托盘」还是「退出（并停掉所有通道）」。',
-            '通道数据仍然是同一份 config.json，和正式版共用。'
-          )
-          Set-Content -Path out/README-SHELL.txt -Value $note -Encoding UTF8
-          Get-ChildItem out | Format-Table Name, Length
+          set -e
+          if [ '${{ matrix.target }}' = 'windows' ]; then
+            cp -r dist/. app/flutter/out/
+          else
+            cp dist/oct dist/cloudflared app/flutter/out/
+            chmod +x app/flutter/out/oct app/flutter/out/cloudflared
+          fi
+          printf '%s\n' \
+            '这是 OCT（一键隧道）的桌面外壳预览版，核心（oct / cloudflared）已经打包在同一目录里。' \
+            '' \
+            '  新界面：打开 oct_shell（Windows 上是 oct_shell.exe）' \
+            '  命令行：./oct help              看全部命令' \
+            '          ./oct daemon start      只起后台守护进程（不弹浏览器）' \
+            '' \
+            '外壳第一次打开时会自动在后台执行 oct daemon start；托盘图标在右下角；' \
+            '点窗口右上角的 × 会问你「最小化到托盘」还是「退出（并停掉所有通道）」。' \
+            '通道数据是同一份 config.json。' > app/flutter/out/START-HERE.txt
+          ls -lh app/flutter/out | head -25
 
-      - name: Zip (windows)
+      - name: Core-only archive (for people who only want the engine)
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -e
+          rm -rf core-out; mkdir -p core-out
+          if [ '${{ matrix.target }}' = 'windows' ]; then
+            cp -r dist/. core-out/
+            (cd core-out && 7z a -tzip "../app/flutter/${{ matrix.coreasset }}" . > /dev/null)
+          else
+            cp dist/oct dist/cloudflared core-out/
+            chmod +x core-out/oct core-out/cloudflared
+            tar -czf "app/flutter/${{ matrix.coreasset }}" -C core-out .
+          fi
+          ls -lh "app/flutter/${{ matrix.coreasset }}"
+
+      - name: Zip the shell (windows)
         if: matrix.target == 'windows'
         shell: bash
         run: |
-          cd out && 7z a -tzip ../${{ matrix.artifact }}.zip . > /dev/null
-          ls -lh ../*.zip
+          cd out && 7z a -tzip "../${{ matrix.artifact }}.zip" . > /dev/null
+          ls -lh ..
+
+      - name: Zip the shell (macos / linux)
+        if: matrix.target != 'windows'
+        shell: bash
+        run: |
+          cd out && zip -qry "../${{ matrix.artifact }}.zip" .
+          ls -lh ..
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: app/flutter/${{ matrix.artifact }}.zip
+          path: |
+            app/flutter/${{ matrix.artifact }}.zip
+            app/flutter/${{ matrix.coreasset }}
           if-no-files-found: error
 
   publish:
@@ -133,7 +209,7 @@ jobs:
         run: |
           cd dist
           ls -lh
-          sha256sum *.zip > SHA256SUMS
+          sha256sum *.zip *.tar.gz > SHA256SUMS
           cat SHA256SUMS
       - name: Publish to prerelease
         env:
@@ -142,10 +218,10 @@ jobs:
           set -x
           cd dist
           TAG=flutter-shell
-          NOTES="Flutter 桌面外壳预览：纯 logo 启动页、通道列表与详情、实时日志、托盘图标与菜单、关闭确认（最小化/退出）。Windows 包已经自带核心（oct.exe / one-click-tunnel.exe / cloudflared.exe），解压双击 oct_shell.exe 就行；macOS / Linux 包暂时只有外壳，需要旁边放一个可用的 oct。"
+          NOTES="OCT 桌面外壳预览（Flutter）：纯 logo 启动页、通道列表与详情、实时日志、托盘图标与菜单、关闭确认（最小化/退出）。三平台的包都已经自带同一份源码编出来的核心：Windows 是 oct.exe，macOS / Linux 是 oct，外加 cloudflared；解压打开 oct_shell 就能用，不用再单独下载核心。另有只含引擎的 oct-core-* 压缩包。"
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --title "OCT Flutter shell (preview)" --notes "$NOTES"
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --title "OCT desktop shell (Flutter, preview)" --notes "$NOTES"
           else
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$NOTES"
           fi
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber *.zip SHA256SUMS
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber *.zip *.tar.gz SHA256SUMS

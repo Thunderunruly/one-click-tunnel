@@ -59,17 +59,23 @@ class Core {
   String? token;
   String? appDir;
 
-  List<String> candidates() {
+  List<String> searchDirs() {
     final sep = Platform.pathSeparator;
     final list = <String>[];
-    void add(String? dir) {
-      if (dir != null && dir.isNotEmpty) list.add(dir + sep + 'config.json');
+    void add(String? d) {
+      if (d != null && d.isNotEmpty && !list.contains(d)) list.add(d);
     }
 
     add(Platform.environment['ONE_CLICK_TUNNEL_DIR']);
-    final exeDir = File(Platform.resolvedExecutable).parent.path;
-    add(exeDir);
-    add(File(exeDir).parent.path);
+    // 从可执行文件所在目录逐级往上找：macOS 的 .app 里 exe 在 oct_shell.app/Contents/MacOS/，
+    // 核心是放在 .app 外面的，所以必须往上找几层。
+    Directory cur = File(Platform.resolvedExecutable).parent;
+    for (var i = 0; i < 4; i++) {
+      add(cur.path);
+      final up = cur.parent;
+      if (up.path == cur.path) break;
+      cur = up;
+    }
     if (Platform.isWindows) {
       final la = Platform.environment['LOCALAPPDATA'];
       final pd = Platform.environment['PROGRAMDATA'];
@@ -81,11 +87,20 @@ class Core {
     } else if (Platform.isMacOS) {
       final h = Platform.environment['HOME'];
       add(h == null ? null : h + '/Library/Application Support/one-click-tunnel');
+      add('/usr/local/one-click-tunnel');
+      add('/opt/one-click-tunnel');
     } else {
       final h = Platform.environment['HOME'];
       add(h == null ? null : h + '/.config/one-click-tunnel');
+      add('/usr/local/one-click-tunnel');
+      add('/opt/one-click-tunnel');
     }
     return list;
+  }
+
+  List<String> candidates() {
+    final sep = Platform.pathSeparator;
+    return searchDirs().map((d) => d + sep + 'config.json').toList();
   }
 
   Future<void> loadToken() async {
@@ -153,10 +168,8 @@ class Core {
 
   Future<bool> startCore() async {
     final sep = Platform.pathSeparator;
-    final exeDir = File(Platform.resolvedExecutable).parent.path;
     final names = Platform.isWindows ? <String>['oct.exe'] : <String>['oct'];
-    final dirs = <String>[exeDir, if (appDir != null) appDir as String];
-    for (final d in dirs) {
+    for (final d in searchDirs()) {
       for (final n in names) {
         final c = d + sep + n;
         try {

@@ -9,7 +9,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const BUILD = path.join(ROOT, 'build');
 const DIST = path.join(ROOT, 'dist');
-const OUT = path.join(DIST, 'oct.exe');
+const IS_WIN = process.platform === 'win32';
+const IS_MAC = process.platform === 'darwin';
+const OUT = path.join(DIST, IS_WIN ? 'oct.exe' : 'oct');
 const BUNDLE = path.join(BUILD, 'bundle.cjs');
 const SENTINEL = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
 
@@ -80,17 +82,44 @@ const blob = path.join(BUILD, 'sea-prep.blob');
 if (!fs.existsSync(blob)) throw new Error('未生成 ' + blob);
 fs.copyFileSync(process.execPath, OUT);
 console.log('已复制 node 运行时: ' + process.execPath + ' -> ' + OUT);
-const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-run(npxCmd, ['--yes', 'postject', OUT, 'NODE_SEA_BLOB', blob, '--sentinel-fuse', SENTINEL], { shell: true });
-
-const cfSrc = path.join(ROOT, 'cloudflared.exe');
-if (fs.existsSync(cfSrc)) { fs.copyFileSync(cfSrc, path.join(DIST, 'cloudflared.exe')); console.log('已复制 cloudflared.exe'); }
-else console.log('注意: 没找到 cloudflared.exe，exe 首次运行会自动下载');
-for (const f of ['install.cmd', 'install.ps1', 'uninstall.cmd', 'uninstall.ps1', 'start.cmd', 'tray.cmd', 'stop-all.cmd', 'stop.cmd', 'README.md']) {
-  const s = path.join(ROOT, 'installer', f);
-  if (fs.existsSync(s)) fs.copyFileSync(s, path.join(DIST, f));
+if (IS_MAC) {
+  // macOS 上 node 自带签名，postject 改完二进制签名就失效了，必须先摘掉再注入，注入完再重新 ad-hoc 签名
+  try { run('codesign', ['--remove-signature', OUT]); } catch (e) { console.log('（codesign 摘签名失败，继续尝试：' + (e && e.message ? e.message : e) + '）'); }
 }
-run(process.execPath, [path.join(ROOT, 'build', 'make-launcher.mjs')]);
+const npxCmd = IS_WIN ? 'npx.cmd' : 'npx';
+const pjArgs = ['--yes', 'postject', OUT, 'NODE_SEA_BLOB', blob, '--sentinel-fuse', SENTINEL];
+if (IS_MAC) pjArgs.push('--macho-segment-name', 'NODE_SEA');
+run(npxCmd, pjArgs, { shell: true });
+if (IS_MAC) run('codesign', ['--sign', '-', OUT]);
+if (!IS_WIN) fs.chmodSync(OUT, 0o755);
+
+const cfName = IS_WIN ? 'cloudflared.exe' : 'cloudflared';
+const cfSrc = path.join(ROOT, cfName);
+if (fs.existsSync(cfSrc)) {
+  fs.copyFileSync(cfSrc, path.join(DIST, cfName));
+  if (!IS_WIN) fs.chmodSync(path.join(DIST, cfName), 0o755);
+  console.log('已复制 ' + cfName);
+} else console.log('注意: 没找到 ' + cfName + '，首次运行会自动下载');
+if (IS_WIN) {
+  // Windows 专有的启动脚本与 GUI 子系统启动器（unix 上双击就是外壳/终端，不需要这些）
+  for (const f of ['install.cmd', 'install.ps1', 'uninstall.cmd', 'uninstall.ps1', 'start.cmd', 'tray.cmd', 'stop-all.cmd', 'stop.cmd', 'README.md']) {
+    const s = path.join(ROOT, 'installer', f);
+    if (fs.existsSync(s)) fs.copyFileSync(s, path.join(DIST, f));
+  }
+  run(process.execPath, [path.join(ROOT, 'build', 'make-launcher.mjs')]);
+} else {
+  const s = path.join(ROOT, 'installer', 'README-unix.md');
+  if (fs.existsSync(s)) fs.copyFileSync(s, path.join(DIST, 'README.md'));
+  else {
+    fs.writeFileSync(path.join(DIST, 'README.md'),
+      'OCT（一键隧道）核心\n\n' +
+      '  ./oct app            打开配置页（后台自动起守护进程）\n' +
+      '  ./oct daemon start   只起守护进程\n' +
+      '  ./oct list           看通道状态\n' +
+      '  ./oct help           全部命令\n\n' +
+      'cloudflared 已经在同目录里，不需要另外下载。\n', 'utf8');
+  }
+}
 
 // 清掉旧名字的引擎（1.5.x 叫 public-tunnel.exe），避免发布包里同时躺着两个
 for (const f of fs.readdirSync(DIST)) {
