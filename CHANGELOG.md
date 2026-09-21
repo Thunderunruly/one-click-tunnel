@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+### 新增 —— macOS 通用包 + Linux arm64 核心
+- 新增 \`macos-universal\` job：把 arm64 和 x64 两个 macOS 构建用 \`lipo\` 合并成一个通用包
+  （\`oct_shell.app\` / \`oct\` / \`cloudflared\` 三个都是 x86_64+arm64 双架构），合并后重新 ad-hoc 签名，
+  并跑一遍核心冒烟（daemon + \`/api/health\`），最后用 \`zip -y\` 打包（保留 .app 里的符号链接）。
+  发布资产：\`oct-shell-macos-universal.zip\`。
+- 正式发布流程的 \`unix-cores\` 增加 Linux arm64 目标（\`ubuntu-24.04-arm\`，原生 arm64 机器编 + 原生冒烟），
+  产出 \`oct-core-linux-arm64.tar.gz\`——树莓派 / ARM 服务器可以直接用。
+- 记录一个踩坑结论：GitHub 的 \`macos-13\`（Intel）标签已经退役，探针实测永远排队；现在 Intel 机器用 \`macos-15-intel\`。
+
+
 ### 修复 —— 相对路径的 --config 会把守护进程的 state 写到别处
 - \`oct daemon start --config 相对路径/config.json\` 时，守护进程子进程是以 appDir 为 cwd 拉起的，
   相对路径被它按自己的 cwd 解释，于是 state/daemon.json 写到了别的地方，父进程傻等 20 秒报"启动超时"。

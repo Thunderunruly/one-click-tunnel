@@ -187,6 +187,16 @@ jobs:
           cd out && 7z a -tzip "../${{ matrix.artifact }}.zip" . > /dev/null
           ls -lh ..
 
+      - name: Archive the raw .app for the universal merge (macOS only)
+        if: matrix.target == 'macos'
+        shell: bash
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          ARCH="${ARTIFACT#oct-shell-macos-}"
+          tar -czf "macos-app-${ARCH}.tar.gz" -C build/macos/Build/Products/Release oct_shell.app
+          ls -lh macos-app-*.tar.gz
+
       - name: Zip the shell (macos / linux)
         if: matrix.target != 'windows'
         shell: bash
@@ -202,6 +212,81 @@ jobs:
             app/flutter/${{ matrix.coreasset }}
           if-no-files-found: error
 
+  macos-universal:
+    name: merge macOS arm64 + x64 into one universal package
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dl
+          merge-multiple: true
+
+      - name: lipo merge (.app + oct + cloudflared)
+        shell: bash
+        run: |
+          set -e
+          ls -lh dl
+          mkdir -p a64 x64 core-arm64 core-x64 uni
+          tar -xzf dl/macos-app-arm64.tar.gz -C a64
+          tar -xzf dl/macos-app-x64.tar.gz -C x64
+          tar -xzf dl/oct-core-macos-arm64.tar.gz -C core-arm64
+          tar -xzf dl/oct-core-macos-x64.tar.gz -C core-x64
+          cp -R a64/oct_shell.app uni/
+          cd a64
+          find oct_shell.app -type f -print0 | while IFS= read -r -d '' f; do
+            if [ -f "../x64/$f" ] && file "$f" | grep -q 'Mach-O'; then
+              lipo -create "$f" "../x64/$f" -output "../uni/$f"
+            fi
+          done
+          cd ..
+          lipo -create core-arm64/oct core-x64/oct -output uni/oct
+          lipo -create core-arm64/cloudflared core-x64/cloudflared -output uni/cloudflared
+          chmod +x uni/oct uni/cloudflared
+          codesign --force --deep --sign - uni/oct_shell.app
+          codesign --force --sign - uni/oct
+          codesign --force --sign - uni/cloudflared
+          echo "--- arch check: each of these must list BOTH x86_64 and arm64"
+          lipo -info uni/oct_shell.app/Contents/MacOS/oct_shell
+          lipo -info uni/oct
+          lipo -info uni/cloudflared
+
+      - name: Smoke-test the universal core (runs the arm64 slice)
+        shell: bash
+        run: |
+          set -e
+          ./uni/oct version
+          SMOKE=.smoke
+          rm -rf "$SMOKE"; mkdir -p "$SMOKE"
+          ./uni/oct daemon start --config "$SMOKE/config.json"
+          sleep 3
+          PORT=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).port)" "$SMOKE/state/daemon.json")
+          echo "daemon port: $PORT"
+          curl -fsS "http://127.0.0.1:$PORT/api/health"; echo
+          ./uni/oct daemon stop --config "$SMOKE/config.json"
+          rm -rf "$SMOKE"
+
+      - name: Package the universal zip
+        shell: bash
+        run: |
+          set -e
+          printf '%s\n' \
+            'OCT universal package (Apple Silicon + Intel in one app / one core)' \
+            '' \
+            '  GUI:  open oct_shell.app' \
+            '  CLI:  ./oct help' \
+            '' \
+            'oct_shell.app, oct and cloudflared are all lipo-merged universal binaries (x86_64 + arm64).' > uni/START-HERE.txt
+          cd uni && zip -qry -y ../oct-shell-macos-universal.zip .
+          ls -lh ../oct-shell-macos-universal.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oct-shell-macos-universal
+          path: oct-shell-macos-universal.zip
+          if-no-files-found: error
+
   publish:
     needs: build
     runs-on: ubuntu-latest
@@ -213,6 +298,7 @@ jobs:
       - name: Checksums
         run: |
           cd dist
+          rm -f macos-app-*.tar.gz
           ls -lh
           sha256sum *.zip *.tar.gz > SHA256SUMS
           cat SHA256SUMS
