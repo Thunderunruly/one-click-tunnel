@@ -187,6 +187,18 @@ jobs:
           cd out && 7z a -tzip "../${{ matrix.artifact }}.zip" . > /dev/null
           ls -lh ..
 
+      - name: Report architecture (macOS only)
+        if: matrix.target == 'macos'
+        shell: bash
+        run: |
+          echo "host arch: $(uname -m)"
+          flutter --version | head -2
+          APP=build/macos/Build/Products/Release/oct_shell.app
+          echo "runner exe: $(lipo -archs "$APP/Contents/MacOS/oct_shell" 2>/dev/null || file "$APP/Contents/MacOS/oct_shell")"
+          for f in "$APP"/Contents/Frameworks/*.framework/Versions/A/*; do
+            if [ -f "$f" ] && file "$f" | grep -q Mach-O; then echo "$(basename "$f"): $(lipo -archs "$f" 2>/dev/null)"; fi
+          done
+
       - name: Archive the raw .app for the universal merge (macOS only)
         if: matrix.target == 'macos'
         shell: bash
@@ -234,16 +246,27 @@ jobs:
           tar -xzf dl/macos-app-x64.tar.gz -C x64
           tar -xzf dl/oct-core-macos-arm64.tar.gz -C core-arm64
           tar -xzf dl/oct-core-macos-x64.tar.gz -C core-x64
-          cp -R a64/oct_shell.app uni/
-          cd a64
-          find oct_shell.app -type f -print0 | while IFS= read -r -d '' f; do
-            if [ -f "../x64/$f" ] && file "$f" | grep -q 'Mach-O'; then
-              lipo -create "$f" "../x64/$f" -output "../uni/$f"
-            fi
-          done
-          cd ..
-          lipo -create core-arm64/oct core-x64/oct -output uni/oct
-          lipo -create core-arm64/cloudflared core-x64/cloudflared -output uni/cloudflared
+          A=$(lipo -archs a64/oct_shell.app/Contents/MacOS/oct_shell)
+          B=$(lipo -archs x64/oct_shell.app/Contents/MacOS/oct_shell)
+          echo "arm64-build app arch: $A"
+          echo "x64-build app arch:   $B"
+          if [ "$A" = "$B" ]; then
+            echo "::warning::两个 macOS 构建的架构相同（$A），lipo 合并没有意义，改打单架构通用包（这说明 Flutter SDK 在 arm64 runner 上产出的其实是同一架构，需要单独修）"
+            cp -R a64/oct_shell.app uni/
+            cp core-arm64/oct uni/oct
+            cp core-arm64/cloudflared uni/cloudflared
+          else
+            cp -R a64/oct_shell.app uni/
+            cd a64
+            find oct_shell.app -type f -print0 | while IFS= read -r -d '' f; do
+              if [ -f "../x64/$f" ] && file "$f" | grep -q 'Mach-O'; then
+                lipo -create "$f" "../x64/$f" -output "../uni/$f"
+              fi
+            done
+            cd ..
+            lipo -create core-arm64/oct core-x64/oct -output uni/oct
+            lipo -create core-arm64/cloudflared core-x64/cloudflared -output uni/cloudflared
+          fi
           chmod +x uni/oct uni/cloudflared
           codesign --force --deep --sign - uni/oct_shell.app
           codesign --force --sign - uni/oct
