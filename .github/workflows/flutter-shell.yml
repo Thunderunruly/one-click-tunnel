@@ -250,13 +250,8 @@ jobs:
           B=$(lipo -archs x64/oct_shell.app/Contents/MacOS/oct_shell)
           echo "arm64-build app arch: $A"
           echo "x64-build app arch:   $B"
-          if [ "$A" = "$B" ]; then
-            echo "::warning::两个 macOS 构建的架构相同（$A），lipo 合并没有意义，改打单架构通用包（这说明 Flutter SDK 在 arm64 runner 上产出的其实是同一架构，需要单独修）"
-            cp -R a64/oct_shell.app uni/
-            cp core-arm64/oct uni/oct
-            cp core-arm64/cloudflared uni/cloudflared
-          else
-            cp -R a64/oct_shell.app uni/
+          cp -R a64/oct_shell.app uni/
+          if [ "$A" != "$B" ]; then
             cd a64
             find oct_shell.app -type f -print0 | while IFS= read -r -d '' f; do
               if [ -f "../x64/$f" ] && file "$f" | grep -q 'Mach-O'; then
@@ -264,9 +259,22 @@ jobs:
               fi
             done
             cd ..
+          else
+            echo "app 本身已经是通用二进制（$A），不用再合并"
+          fi
+          CA=$(lipo -archs core-arm64/oct)
+          CB=$(lipo -archs core-x64/oct)
+          echo "arm64 构建的核心架构: $CA"
+          echo "x64   构建的核心架构: $CB"
+          if [ "$CA" != "$CB" ]; then
             lipo -create core-arm64/oct core-x64/oct -output uni/oct
             lipo -create core-arm64/cloudflared core-x64/cloudflared -output uni/cloudflared
+          else
+            echo "::warning::两个核心的架构相同（$CA），通用包里只有这一个架构"
+            cp core-arm64/oct uni/oct
+            cp core-arm64/cloudflared uni/cloudflared
           fi
+          chmod +x uni/oct uni/cloudflared
           chmod +x uni/oct uni/cloudflared
           codesign --force --deep --sign - uni/oct_shell.app
           codesign --force --sign - uni/oct
