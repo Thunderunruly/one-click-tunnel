@@ -14,8 +14,87 @@ permissions:
   contents: write
 
 jobs:
+  unix-cores:
+    name: build unix cores (macOS / Linux)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            asset: oct-core-linux-x64.tar.gz
+            cflurl: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          - os: macos-15-intel
+            asset: oct-core-macos-x64.tar.gz
+            cflurl: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz
+          - os: macos-latest
+            asset: oct-core-macos-arm64.tar.gz
+            cflurl: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz
+    runs-on: @D{{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download cloudflared
+        shell: bash
+        run: |
+          set -e
+          curl -fsSL -o cf-download '@D{{ matrix.cflurl }}'
+          if [ "$(uname -s)" = "Darwin" ]; then
+            tar -xzf cf-download && rm -f cf-download && chmod +x cloudflared
+          else
+            mv cf-download cloudflared && chmod +x cloudflared
+          fi
+          ls -lh cloudflared
+
+      - name: Build the core (Node SEA)
+        shell: bash
+        run: |
+          node --version
+          node build/make-exe.mjs
+          ls -lh dist
+
+      - name: Smoke-test the core (version / daemon / HTTP API)
+        shell: bash
+        run: |
+          set -e
+          BIN=dist/oct
+          "$BIN" version
+          "$BIN" help | head -3
+          SMOKE=.smoke
+          rm -rf "$SMOKE"; mkdir -p "$SMOKE"
+          "$BIN" daemon start --config "$SMOKE/config.json"
+          sleep 3
+          PORT=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).port)" "$SMOKE/state/daemon.json")
+          echo "daemon port: $PORT"
+          curl -fsS "http://127.0.0.1:$PORT/api/health"; echo
+          "$BIN" list --config "$SMOKE/config.json" | head -4
+          "$BIN" daemon stop --config "$SMOKE/config.json"
+          rm -rf "$SMOKE"
+
+      - name: Package the core tarball
+        shell: bash
+        run: |
+          set -e
+          mkdir -p release
+          rm -rf core-out; mkdir -p core-out
+          cp dist/oct dist/cloudflared core-out/
+          chmod +x core-out/oct core-out/cloudflared
+          tar -czf "release/@D{{ matrix.asset }}" -C core-out .
+          ls -lh release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: @D{{ matrix.asset }}
+          path: release/@D{{ matrix.asset }}
+          if-no-files-found: error
+
   release:
     name: build exe + installers and publish release
+    needs: unix-cores
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -71,13 +150,18 @@ jobs:
       - name: Build Inno Setup installer (if ISCC is available on the runner)
         run: node build/make-setup.mjs
 
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
       - name: Checksums (covers every published artifact, so the built-in updater can verify downloads)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force release | Out-Null
           $lines = @()
           $targets = @('dist/oct.exe','dist/cloudflared.exe')
-          $targets += @(Get-ChildItem release/*.zip, release/*setup*.exe -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          $targets += @(Get-ChildItem release/*.zip, release/*setup*.exe, release/*.tar.gz -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
           foreach ($f in $targets) {
             $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
             $lines += ($h + '  ' + (Split-Path $f -Leaf))
@@ -118,6 +202,7 @@ jobs:
           $assets = @()
           $assets += @(Get-ChildItem release/*.zip -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
           $assets += @(Get-ChildItem release/*setup*.exe -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          $assets += @(Get-ChildItem release/*.tar.gz -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
           $assets += @(Get-ChildItem release/SHA256SUMS.txt -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
           Write-Host "tag: $tag"
           foreach ($a in $assets) { Write-Host "asset: $a" }
@@ -130,6 +215,9 @@ jobs:
             'After install, launch the shortcut: it opens the local config page (background daemon + tray icon).',
             'You can run many tunnels at once, each with its own password and expiry time.',
             'AI integration: point your MCP host at oct.exe with the argument mcp.',
+            '',
+            'macOS / Linux: download oct-core-macos-x64 / oct-core-macos-arm64 / oct-core-linux-x64 (tar.gz), unpack and run ./oct help;'
+            'the tar.gz already contains cloudflared. The Flutter desktop shell (preview) is on the flutter-shell pre-release.',
             '',
             'Verify downloads against SHA256SUMS.txt.'
           ) -join [Environment]::NewLine

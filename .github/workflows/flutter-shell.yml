@@ -25,6 +25,11 @@ jobs:
             artifact: oct-shell-macos-arm64
             coreasset: oct-core-macos-arm64.tar.gz
             cflurl: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz
+          - os: macos-15-intel
+            target: macos
+            artifact: oct-shell-macos-x64
+            coreasset: oct-core-macos-x64.tar.gz
+            cflurl: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz
           - os: ubuntu-22.04
             target: linux
             artifact: oct-shell-linux-x64
