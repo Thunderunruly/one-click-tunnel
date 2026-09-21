@@ -752,6 +752,27 @@ const SUBCOMMANDS = ['gui', 'tray', 'mcp', 'list', 'status', 'start', 'stop', 'e
   'autostart-on', 'autostart-off', 'regen', 'add', 'rm', 'remove', 'delete', 'config', 'api', 'daemon', 'help',
   'update', 'version', 'app', 'login', 'domain', 'undomain', 'info', 'autostart'];
 const ARGV = process.argv.slice(2);
+// 裸跑（一个参数都不给）不再默默拿默认端口 3000 开一条隧道：那会把"我就想看下"变成"公网上多了个洞"。
+// 前台单通道的老用法仍然可用，但必须显式给参数，例如 oct --port 3000。
+if (!ARGV.length) {
+  console.log([
+    '',
+    '一键隧道 OCT（One Click Tunnel）—— 你只敲了 oct，我什么都没启动。',
+    '',
+    '  one-click-tunnel.exe    双击它 = 图形界面（托盘 + 配置页）',
+    '  oct app                 打开配置页窗口（后台自动起守护进程）',
+    '  oct daemon start        只起守护进程，不弹浏览器',
+    '  oct list                看所有通道状态',
+    '  oct add --port 3000     新增一条通道（本机 3000 端口）并立刻开隧道',
+    '  oct start <id>          启动指定通道',
+    '  oct help                全部命令',
+    '',
+    '  前台单通道模式还能用，但要显式给参数，例如：',
+    '  oct --port 3000         把本机 3000 端口开成隧道，Ctrl+C 结束',
+    '',
+  ].join('\n'));
+  process.exit(0);
+}
 if (ARGV.length && !ARGV[0].startsWith('-') && SUBCOMMANDS.includes(ARGV[0])) {
   require('./lib/cli.js').run(ARGV[0], ARGV.slice(1))
     .then((code) => process.exit(code || 0))

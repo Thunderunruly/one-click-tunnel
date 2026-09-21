@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+### 新增 —— 桌面外壳自带核心 + 裸跑不再乱开隧道 + 配置页看得见托盘
+- Flutter 外壳的 Windows 包在 CI 里自动把正式版核心（oct.exe / one-click-tunnel.exe / cloudflared.exe）一起装进 zip，
+  解压双击 oct_shell.exe 就能用，不用再手动把外壳挪到核心旁边；zip 里附 README-SHELL.txt 说明两个入口的区别。
+- 外壳自动起的核心改成 \`oct daemon start\`（只起后台守护进程），不再走 \`oct app\`（会多弹一个浏览器窗口）。
+- **裸跑 \`oct\`（一个参数都不给）不再默默用默认端口 3000 开一条公网隧道**，改为打印用法指引并退出 0。
+  前台单通道的老用法仍在：必须显式给参数，例如 \`oct --port 3000\`。
+- 配置页顶栏新增托盘状态（运行中/未运行 + 进程号）与"启动托盘 / 关闭托盘"按钮，守护进程信息加上运行时长；
+  \`/api/health\` 增加 pid / uptimeSec / tray，\`/api/state\` 增加 trayStatus（实时）与 daemon 运行信息。
+- 新增 \`test-cli.mjs\`（6 项）：裸跑只打印指引、不启动隧道、不占端口，help/version/老参数入口可用；
+  GUI 测试加 4 项（G16f~G16i）覆盖新的 health/state/tray 接口。
+
+
 ### 新增 —— Flutter 桌面外壳（预览）
 - 新增 `app/flutter/`：Flutter 写的桌面外壳（Windows / macOS / Linux），只通过本地 HTTP API 与核心通信，
   界面是纯 logo 启动页 → 通道列表 → 详情卡片（链接/参数/启动停止）→ 实时日志 → 托盘（运行时生成图标），

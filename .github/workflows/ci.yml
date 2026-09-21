@@ -32,13 +32,16 @@ jobs:
             node --check $_.FullName
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
-          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-update.mjs','test-named.mjs','test-upstream.mjs','test-port-isolation.mjs','test-exe.mjs','test-launcher.mjs','test-tray.mjs','build/test-installer.mjs')) {
+          foreach ($f in @('security-test.mjs','security-test-gui.mjs','security-test-live.mjs','test-multi.mjs','test-mcp.mjs','test-update.mjs','test-named.mjs','test-upstream.mjs','test-port-isolation.mjs','test-exe.mjs','test-launcher.mjs','test-cli.mjs','test-tray.mjs','build/test-installer.mjs')) {
             node --check $f
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
 
       - name: Classic single-tunnel security tests (72)
         run: node security-test.mjs
+
+      - name: 'CLI behaviour tests (6): bare run prints guidance, no tunnel; help/version'
+        run: node test-cli.mjs
 
       - name: Multi-tunnel manager tests (25)
         run: node test-multi.mjs

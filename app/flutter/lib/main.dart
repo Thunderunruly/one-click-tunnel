@@ -161,7 +161,7 @@ class Core {
         final c = d + sep + n;
         try {
           if (!File(c).existsSync()) continue;
-          await Process.start(c, ['app'], mode: ProcessStartMode.detached);
+          await Process.start(c, ['daemon', 'start'], mode: ProcessStartMode.detached);
           return true;
         } catch (_) {}
       }

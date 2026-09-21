@@ -68,7 +68,6 @@ jobs:
         run: |
           mkdir -p out
           cp -r build/windows/x64/runner/Release/. out/
-          cd out && 7z a -tzip ../${{ matrix.artifact }}.zip . > /dev/null
 
       - name: Package (macos)
         if: matrix.target == 'macos'
@@ -85,6 +84,36 @@ jobs:
           mkdir -p out
           cp -r build/linux/x64/release/bundle/. out/
           cd out && zip -qry ../${{ matrix.artifact }}.zip .
+
+      - name: Bundle the core (windows only)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download --repo $env:GITHUB_REPOSITORY --pattern 'one-click-tunnel-*-win-x64.zip' --dir corezip
+          Get-ChildItem corezip | Format-Table Name, Length
+          Expand-Archive -Path (Get-ChildItem corezip/*.zip | Select-Object -First 1).FullName -DestinationPath core -Force
+          Copy-Item -Recurse -Force core/* out/
+          $note = @(
+            '这是 OCT（一键隧道）的 Flutter 桌面外壳预览版，核心已经打包在一起，不用另外下载。',
+            '',
+            '  双击 oct_shell.exe        -> 新界面（Flutter：纯 logo 启动页 / 通道列表 / 实时日志 / 托盘）',
+            '  双击 one-click-tunnel.exe -> 旧界面（浏览器窗口版；命令行参数都在 oct.exe 上）',
+            '',
+            '第一次打开时外壳会自动在后台起守护进程（oct.exe daemon start）。托盘图标在任务栏右下角，',
+            'Win11 默认收进 ^ 溢出区。点窗口右上角 × 会问你「最小化到托盘」还是「退出（并停掉所有通道）」。',
+            '通道数据仍然是同一份 config.json，和正式版共用。'
+          )
+          Set-Content -Path out/README-SHELL.txt -Value $note -Encoding UTF8
+          Get-ChildItem out | Format-Table Name, Length
+
+      - name: Zip (windows)
+        if: matrix.target == 'windows'
+        shell: bash
+        run: |
+          cd out && 7z a -tzip ../${{ matrix.artifact }}.zip . > /dev/null
+          ls -lh ../*.zip
 
       - uses: actions/upload-artifact@v4
         with:
@@ -113,9 +142,10 @@ jobs:
           set -x
           cd dist
           TAG=flutter-shell
+          NOTES="Flutter 桌面外壳预览：纯 logo 启动页、通道列表与详情、实时日志、托盘图标与菜单、关闭确认（最小化/退出）。Windows 包已经自带核心（oct.exe / one-click-tunnel.exe / cloudflared.exe），解压双击 oct_shell.exe 就行；macOS / Linux 包暂时只有外壳，需要旁边放一个可用的 oct。"
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease \
-              --title "OCT Flutter shell (preview)" \
-              --notes "Flutter 桌面外壳预览：纯 logo 启动页、通道列表与详情、实时日志、托盘图标与菜单、关闭确认（最小化/退出）。隧道核心仍是 Node SEA 打包的 oct.exe，请配合 1.6.x 安装包使用。"
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --title "OCT Flutter shell (preview)" --notes "$NOTES"
+          else
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$NOTES"
           fi
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber *.zip SHA256SUMS

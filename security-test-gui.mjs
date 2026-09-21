@@ -127,6 +127,23 @@ async function main() {
   const updBad = await req(port, 'POST', '/api/update', { headers: { 'x-tunnel-token': token, origin: 'http://127.0.0.1:' + port }, body: { action: 'nope' } });
   ok('G16d 未知更新动作 400', updBad.status === 400, updBad.status);
 
+  const h2 = await req(port, 'GET', '/api/health');
+  ok('G16f /api/health 带 pid / 运行时长 / 托盘状态（仍不泄露 token）',
+    h2.status === 200 && typeof h2.json.pid === 'number' && typeof h2.json.uptimeSec === 'number'
+    && typeof h2.json.tray === 'boolean' && h2.body.indexOf(token) < 0, h2.body.slice(0, 110));
+  const trayState = await req(port, 'GET', '/api/state', { headers: { 'x-tunnel-token': token } });
+  const trs = trayState.json.trayStatus || {};
+  const dmon = trayState.json.daemon || {};
+  ok('G16g /api/state 暴露托盘与守护进程运行信息（且和 state.pid 一致）',
+    typeof trs.running === 'boolean' && typeof trs.supported === 'boolean' && typeof dmon.uptimeSec === 'number'
+    && dmon.pid === trayState.json.pid, JSON.stringify({ trs: trs, dmon: dmon }));
+  const trayDry = await req(port, 'POST', '/api/action', { headers: { 'x-tunnel-token': token, origin: 'http://127.0.0.1:' + port }, body: { action: 'startTray', dryRun: true } });
+  ok('G16h 启动托盘支持 dryRun（测试不会真的拉起 powershell 托盘）',
+    (trayDry.status === 200 && trayDry.json.wouldStart === true) || (trayDry.status === 400 && /不支持托盘/.test(trayDry.json.error || '')),
+    trayDry.status + ' ' + trayDry.body.slice(0, 80));
+  const trayStop = await req(port, 'POST', '/api/action', { headers: { 'x-tunnel-token': token, origin: 'http://127.0.0.1:' + port }, body: { action: 'stopTray' } });
+  ok('G16i 未运行时关闭托盘是安全空操作', trayStop.status === 200, trayStop.status);
+
   const log = await req(port, 'GET', '/api/log?id=' + encodeURIComponent(id), { headers: { 'x-tunnel-token': token } });
   ok('G16 能读取通道日志', log.status === 200 && typeof log.json.log === 'string', log.status);
 

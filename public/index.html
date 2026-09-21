@@ -53,6 +53,8 @@
   <div class="top">
     <h1>一键隧道 · 配置页</h1>
     <span class="muted" id="daemonInfo">连接中...</span>
+    <span class="muted" id="trayInfo"></span>
+    <button id="trayBtn" data-act="trayToggle" title="托盘图标常驻任务栏右下角（Win11 默认收进 ^ 溢出区），右键可操作通道">启动托盘</button>
     <span class="grow"></span>
     <button class="primary" data-act="startAll">全部启动</button>
     <button data-act="stopAll">全部停止</button>
@@ -284,9 +286,23 @@
     if (!found) html = '<option value="' + esc(cur) + '" selected>' + esc(cur) + '</option>' + html;
     return html;
   }
+  function fmtUptime(sec) {
+    var s = Number(sec) || 0;
+    if (s < 60) return s + ' 秒';
+    if (s < 3600) return Math.floor(s / 60) + ' 分 ' + (s % 60) + ' 秒';
+    return Math.floor(s / 3600) + ' 小时 ' + Math.floor((s % 3600) / 60) + ' 分';
+  }
   function render() {
     if (!state) return;
-    document.getElementById('daemonInfo').textContent = '守护进程 pid ' + state.pid + ' · 配置页端口 ' + state.guiPort + ' · 共 ' + state.profiles.length + ' 个通道';
+    var dmon = state.daemon || {};
+    var trs = state.trayStatus || {};
+    document.getElementById('daemonInfo').textContent = '守护进程 pid ' + state.pid + ' · 配置页端口 ' + state.guiPort
+      + (dmon.uptimeSec === undefined ? '' : (' · 已运行 ' + fmtUptime(dmon.uptimeSec)))
+      + ' · 共 ' + state.profiles.length + ' 个通道';
+    document.getElementById('trayInfo').textContent = trs.supported === false ? '托盘：当前平台不支持'
+      : (trs.running ? ('托盘：运行中（pid ' + trs.pid + '）') : '托盘：未运行');
+    var trayBtn = document.getElementById('trayBtn');
+    if (trayBtn) { trayBtn.textContent = trs.running ? '关闭托盘' : '启动托盘'; trayBtn.disabled = trs.supported === false; }
     var list = document.getElementById('list');
     if (!state.profiles.length) {
       list.innerHTML = '<div class="card"><span class="muted">还没有通道，先在上面「新增通道」里加一个（比如 3000）。</span></div>';
@@ -453,7 +469,11 @@
         .catch(function (e) { toast(e.message, true); });
       return;
     }
-    if (act === 'startAll') p = api('/api/action', { action: 'startAll' });
+    if (act === 'trayToggle') {
+      var trRunning = !!(state && state.trayStatus && state.trayStatus.running);
+      p = api('/api/action', { action: trRunning ? 'stopTray' : 'startTray' });
+    }
+    else if (act === 'startAll') p = api('/api/action', { action: 'startAll' });
     else if (act === 'stopAll') p = api('/api/action', { action: 'stopAll' });
     else if (act === 'saveSettings') p = api('/api/settings', {
       defaults: { ttl: document.getElementById('setTtl').value, passwordMode: document.getElementById('setPwMode').value, gatewayStart: Number(document.getElementById('setGwStart').value), rateLimit: Number(document.getElementById('setRateLimit').value) },
