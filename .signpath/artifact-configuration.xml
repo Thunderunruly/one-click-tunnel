@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SignPath 签名配置：告诉 SignPath 这个 zip 里哪些文件要签名 -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration">
+  <zip-file>
+    <pe-file path="oct.exe" />
+    <pe-file path="one-click-tunnel.exe" />
+    <pe-file path="oct_shell.exe" />
+    <!-- cloudflared.exe 是 Cloudflare 官方签名的，别再签（会破坏它的签名链），所以故意不列 -->
+  </zip-file>
+</artifact-configuration>
