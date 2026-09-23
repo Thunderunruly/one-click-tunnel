@@ -209,6 +209,20 @@ jobs:
           tar -czf "macos-app-${ARCH}.tar.gz" -C build/macos/Build/Products/Release oct_shell.app
           ls -lh macos-app-*.tar.gz
 
+      - name: Zip shell-only (windows, for people whose AV blocks the big zip)
+        if: matrix.target == 'windows'
+        shell: bash
+        run: |
+          rm -rf shellonly && mkdir -p shellonly
+          cp -r build/windows/x64/runner/Release/. shellonly/
+          printf '%s\n' \
+            'OCT 桌面外壳（这一包里没有引擎）' \
+            '' \
+            '用法：把 oct-core-windows-x64.zip 解压到一个目录，再把本包解压到同一个目录里，' \
+            '然后双击 oct_shell.exe。' > shellonly/START-HERE.txt
+          cd shellonly && 7z a -tzip "../oct-shell-only-windows-x64.zip" . > /dev/null
+          ls -lh ../oct-shell-only-windows-x64.zip
+
       - name: Zip the shell (macos / linux)
         if: matrix.target != 'windows'
         shell: bash
@@ -223,6 +237,7 @@ jobs:
             app/flutter/${{ matrix.artifact }}.zip
             app/flutter/${{ matrix.coreasset }}
             app/flutter/macos-app-*.tar.gz
+            app/flutter/oct-shell-only-windows-x64.zip
           if-no-files-found: error
 
   macos-universal:
